@@ -34,6 +34,7 @@ const client = new Discord.Client({
 });
 
 client.on(Discord.Events.ClientReady, events.onReady);
+client.on(Discord.Events.InteractionCreate, events.onInteraction)
 
 console.info(`Bot is starting with config: ${JSON.stringify({
 	...CONFIG,

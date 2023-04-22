@@ -13,6 +13,7 @@ node_modules/
 *.swp
 dev-token
 *config.json
+todo
 
 # Output files
 output.log

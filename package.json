@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "description": "A Discord bot for sharing bans across servers.",
   "private": true,
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
   "main": "src/main.js",
   "scripts": {
     "start": "node .",
@@ -15,10 +20,10 @@
     "administration",
     "sharing"
   ],
-  "author": "Mimickal",
+  "author": "Mimickal <mimickal.dev@gmail.com>",
   "license": "AGPL-3.0",
   "dependencies": {
-    "discord-command-registry": "file:../discord-command-registry",
+    "discord-command-registry": "^2.1.0",
     "discord.js": "^14.9.0"
   }
 }
