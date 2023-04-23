@@ -6,7 +6,13 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
+const {
+	GuildBan,
+	Message,
+} = require('discord.js');
+
 const commands = require('./commands');
+const { BanEmbed, BanButton } = require('./components');
 
 /**
  * Event handler for when the bot is logged in.
@@ -33,7 +39,56 @@ async function onInteraction(interaction) {
 	}
 }
 
+/**
+ * Event handler for a Guild Member being banned.
+ * @param {GuildBan} ban
+ */
+async function onMemberBanned(ban) {
+
+}
+
+/**
+ * Event handler for a Guild Member being unbanned.
+ * @param {GuildBan} ban
+ */
+async function onMemberUnbanned(ban) {
+
+}
+
+/**
+ * This is for testing, because sending a message is much easier than banning.
+ * @param {Message} message
+ */
+async function testMessage(message) {
+	if (
+		message.channel.id !== '186930896606199808' &&
+		message.author.id !== '139881327469002752'
+	) return;
+	console.log('Running test event');
+
+	const channel = message.channel;
+
+	const info = new BanEmbed({
+		ban: {
+			user: message.author,
+			guild: message.guild,
+		},
+		timestamp: message.createdAt,
+	});
+
+	const banBtn = new BanButton();
+
+	await channel.send({
+		embeds: [info],
+		components: [banBtn],
+	});
+}
+
 module.exports = {
 	onReady,
 	onInteraction,
+	onMemberBanned,
+	onMemberUnbanned,
+
+	testMessage,
 };

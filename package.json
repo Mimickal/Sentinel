@@ -23,6 +23,7 @@
   "author": "Mimickal <mimickal.dev@gmail.com>",
   "license": "AGPL-3.0",
   "dependencies": {
+    "date-fns": "^2.29.3",
     "discord-command-registry": "^2.1.0",
     "discord.js": "^14.9.0"
   }
