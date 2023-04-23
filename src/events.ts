@@ -6,62 +6,67 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-const {
+import {
+	BaseInteraction,
+	ButtonInteraction,
+	Client,
 	GuildBan,
 	Message,
-} = require('discord.js');
+} from 'discord.js';
 
-const commands = require('./commands');
-const { BanEmbed, BanButton } = require('./components');
+import commands from './commands';
+import { BanEmbed, BanButton } from './components';
 
 /**
  * Event handler for when the bot is logged in.
  *
  * Logs the bot user we logged in as.
  */
-async function onReady(client) {
-	console.info(`Logged in as ${client.user.tag} (${client.user.id})`);
+export async function onReady(client: Client) {
+	console.info(`Logged in as ${client.user?.tag} (${client.user?.id})`);
 }
 
 /**
  * Event handler for receiving some kind of interaction.
  * Logs the interaction and passes it on to the command handler.
  */
-async function onInteraction(interaction) {
+export async function onInteraction(interaction: BaseInteraction) {
 	//console.info(`Received ${detail(interaction)}`);
 	console.info('Received interaction');
 
 	try {
-		await commands.execute(interaction);
+		if (interaction.isButton()) {
+			await handleButtonInteraction(interaction);
+		} else {
+			await commands.execute(interaction);
+		}
 	} catch (err) {
 		//logger.error(`${detail(interaction)} error fell through:`, err);
 		console.info('Interaction error fell through:', err);
 	}
 }
 
-/**
- * Event handler for a Guild Member being banned.
- * @param {GuildBan} ban
- */
-async function onMemberBanned(ban) {
+/** Event handler for a Guild Member being banned. */
+export async function onMemberBanned(ban: GuildBan) {
 
 }
 
-/**
- * Event handler for a Guild Member being unbanned.
- * @param {GuildBan} ban
- */
-async function onMemberUnbanned(ban) {
+/** Event handler for a Guild Member being unbanned. */
+export async function onMemberUnbanned(ban: GuildBan) {
 
 }
 
-/**
- * This is for testing, because sending a message is much easier than banning.
- * @param {Message} message
- */
-async function testMessage(message) {
+/** Handler for a button press. */
+async function handleButtonInteraction(interaction: ButtonInteraction) {
+	if (interaction.customId !== BanButton.ID) return;
+
+	console.log('Pressed the button');
+}
+
+/** This is for testing, because sending a message is much easier than banning. */
+export async function testMessage(message: Message) {
 	if (
-		message.channel.id !== '186930896606199808' &&
+		message.channel.id !== '186930896606199808' ||
 		message.author.id !== '139881327469002752'
 	) return;
 	console.log('Running test event');
@@ -72,23 +77,16 @@ async function testMessage(message) {
 		ban: {
 			user: message.author,
 			guild: message.guild,
-		},
+		} as GuildBan, // Hack for testing
 		timestamp: message.createdAt,
 	});
+
 
 	const banBtn = new BanButton();
 
 	await channel.send({
 		embeds: [info],
+		// @ts-ignore This is a false positive.
 		components: [banBtn],
 	});
 }
-
-module.exports = {
-	onReady,
-	onInteraction,
-	onMemberBanned,
-	onMemberUnbanned,
-
-	testMessage,
-};

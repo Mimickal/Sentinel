@@ -6,7 +6,8 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-const {
+import { formatDistance } from 'date-fns';
+import {
 	bold,
 	Colors,
 	ActionRowBuilder,
@@ -14,14 +15,14 @@ const {
 	ButtonStyle,
 	EmbedBuilder,
 	GuildBan,
-} = require('discord.js');
-const { formatDistance } = require('date-fns');
+} from 'discord.js';
 
-class BanButton extends ActionRowBuilder {
+export class BanButton extends ActionRowBuilder {
 	static ID = 'ban';
 
 	constructor() {
-		super().addComponents(new ButtonBuilder()
+		super();
+		this.addComponents(new ButtonBuilder()
 			.setCustomId(BanButton.ID)
 			.setLabel('Ban')
 			.setStyle(ButtonStyle.Danger)
@@ -29,17 +30,18 @@ class BanButton extends ActionRowBuilder {
 	}
 }
 
-class BanEmbed extends EmbedBuilder {
-	/**
-	 * @param {{
-	 *     ban: GuildBan,
-	 *     timestamp: Date,
-	 * }} data
-	 */
-	constructor({ ban, timestamp }) {
+interface BanEmbedProps {
+	ban: GuildBan;
+	timestamp: Date;
+};
+
+export class BanEmbed extends EmbedBuilder {
+
+	constructor({ ban, timestamp}: BanEmbedProps) {
+		super();
+
 		const { guild, user } = ban;
-		super()
-			.setColor(Colors.Red)
+		this.setColor(Colors.Red)
 			.setAuthor({
 				name: `${user.username}#${user.discriminator}`,
 				iconURL: user.displayAvatarURL(),
@@ -49,16 +51,11 @@ class BanEmbed extends EmbedBuilder {
 				name: 'Account Age',
 				value: formatDistance(Date.now(), user.createdAt),
 			})
-			.setFooter({ text: guild.name, iconURL: guild.iconURL() })
+			.setFooter({ text: guild.name, iconURL: guild.iconURL() || undefined })
 			.setTimestamp(timestamp);
 
 		if (ban.reason) {
-			this.addFields({ name: 'Reason', value: ban.reason })
+			this.addFields({ name: 'Reason', value: ban.reason });
 		}
 	}
 }
-
-module.exports = {
-	BanButton,
-	BanEmbed,
-};

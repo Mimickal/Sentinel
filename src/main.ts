@@ -6,12 +6,12 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-const Discord = require('discord.js');
+import * as Discord from 'discord.js';
 
-const events = require('./events');
+import * as events from './events';
 
 const CONFIG = require('../dev-config.json');
-const PACKAGE = require('../package.json');
+const PACKAGE = require('../package-lock.json');
 
 // Everything operates on IDs, so we can safely rely on partials.
 const client = new Discord.Client({
@@ -28,7 +28,7 @@ const client = new Discord.Client({
 	presence: {
 		activities: [{
 			name: `Version ${PACKAGE.version}`,
-			type: Discord.Activity.PLAYING,
+			type: Discord.ActivityType.Playing,
 		}],
 	},
 });
