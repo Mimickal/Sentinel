@@ -16,6 +16,7 @@ import {
 
 import commands from './commands';
 import { BanEmbed, BanButton } from './components';
+import * as database from './database';
 
 /**
  * Event handler for when the bot is logged in.
@@ -71,6 +72,49 @@ export async function testMessage(message: Message) {
 	) return;
 	console.log('Running test event');
 
+
+}
+
+// Going to save each thing we test down here, so we can integrate them later.
+
+async function testGuildRemove(message: Message) {
+	const guild = message.guild!;
+
+	console.log('Left Guild');
+	try {
+		await database.setGuildLeft({
+			id: guild.id,
+			left_at: new Date(Date.now()),
+		});
+	} catch (err) {
+		console.error('Failed to remove Guild from database', (err as Error));
+	}
+}
+
+async function testGuildAdd(message: Message) {
+	const guild = message.guild!;
+
+	console.log('Joined Guild');
+
+	const alertChannel = guild.systemChannel;
+	if (!alertChannel){
+		console.log('Guild has no alert channel and will not receive alerts.');
+	}
+
+	try {
+		await database.upsertGuild({
+			alert_channel_id: guild.systemChannel?.id,
+			id: guild.id,
+			joined_at: guild.joinedAt,
+			left_at: null,
+			name: guild.name,
+		});
+	} catch (err) {
+		console.error('Failed to add Guild to database', (err as Error));
+	}
+}
+
+async function testSendBanAlert(message: Message) {
 	const channel = message.channel;
 
 	const info = new BanEmbed({
