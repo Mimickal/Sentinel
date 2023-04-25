@@ -40,6 +40,7 @@ export interface UserRow {
 }
 
 type AddBanRow = Omit<BanRow, 'id'>;
+type AlertGuildRow = Required<Pick<GuildRow, 'id'|'alert_channel_id'>>;
 type DeletedUserRow = Omit<UserRow, 'created_at'> & Partial<UserRow>;
 type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
 type RemoveBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
@@ -59,6 +60,12 @@ export async function upsertGuild(guild: GuildRow): Promise<void> {
 	await knex<GuildRow>(Tables.GUILDS)
 		.insert(guild)
 		.onConflict('id').merge();
+}
+
+export async function setGuildAlertChannel(guild: AlertGuildRow): Promise<void> {
+	await knex<AlertGuildRow>(Tables.GUILDS)
+		.update('alert_channel_id', guild.alert_channel_id)
+		.where('id', '=', guild.id);
 }
 
 export async function setGuildLeft(guild: LeftGuildRow): Promise<void> {
