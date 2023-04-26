@@ -41,6 +41,8 @@ exports.up = async function(knex) {
 		table.string    ('banned_by', ID_LEN).nullable();
 		table.string    ('reason',    512   ).nullable();
 		table.timestamp ('banned_at'        ).defaultTo(knex.fn.now());
+
+		table.unique(['guild_id', 'user_id']);
 	});
 };
 

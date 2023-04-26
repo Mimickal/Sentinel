@@ -10,6 +10,7 @@ import {
 	BaseInteraction,
 	ButtonInteraction,
 	Client,
+	Guild,
 	GuildBan,
 	Message,
 } from 'discord.js';
@@ -17,6 +18,7 @@ import {
 import commands from './commands';
 import { BanEmbed, BanButton } from './components';
 import * as database from './database';
+import { GuildRow } from './database';
 
 /**
  * Event handler for when the bot is logged in.
@@ -49,7 +51,76 @@ export async function onInteraction(interaction: BaseInteraction) {
 
 /** Event handler for a Guild Member being banned. */
 export async function onMemberBanned(ban: GuildBan) {
+	// Ban doesn't have a timestamp, so we use our own. Close enough.
+	const bannedAt = new Date(Date.now());
 
+	await addBannedUser({ ban, bannedAt });
+
+	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
+	if (ban.reason?.startsWith('Sentinel')) return;
+
+	const guilds = await database.getGuilds();
+	for await (const guild of guilds) {
+		try {
+			await sendBanAlert({
+				ban, bannedAt, guild,
+			});
+		} catch (err) {
+			console.warn('Failed to send ban alert to Guild', err);
+		}
+	}
+}
+
+async function addBannedUser({ ban, bannedAt }: {
+	ban: GuildBan;
+	bannedAt: Date;
+}): Promise<void> {
+	try {
+		await database.addUser({
+			id: ban.user.id,
+			created_at: bannedAt,
+			deleted: false,
+		});
+
+		await database.addBan({
+			banned_at: bannedAt,
+			guild_id: ban.guild?.id,
+			reason: ban.reason,
+			user_id: ban.user?.id,
+		});
+	} catch (err) {
+		console.error('Failed to add ban to database', err);
+	}
+}
+
+async function sendBanAlert({ ban, bannedAt, guild }: {
+	ban: GuildBan;
+	bannedAt: Date;
+	guild: GuildRow;
+}): Promise<void> {
+	// Don't sent alert to the guild the ban came from.
+	if (guild.id === ban.guild.id) return;
+	if (!guild.alert_channel_id) return;
+
+	const existingBan = await database.getUserBan({
+		guild_id: guild.id,
+		user_id: ban.user.id
+	});
+	if (existingBan) return;
+
+	const channel = await ban.client.channels.fetch(guild.alert_channel_id);
+	if (!channel?.isTextBased()) {
+		throw new Error(`Invalid channel ${guild.alert_channel_id}`);
+	}
+
+	await channel.send({
+		embeds: [new BanEmbed({
+			ban: ban,
+			timestamp: bannedAt,
+		})],
+		// @ts-ignore TODO ask djs support why this type isn't playing nice.
+		components: [new BanButton()],
+	});
 }
 
 /** Event handler for a Guild Member being unbanned. */
@@ -112,25 +183,4 @@ async function testGuildAdd(message: Message) {
 	} catch (err) {
 		console.error('Failed to add Guild to database', (err as Error));
 	}
-}
-
-async function testSendBanAlert(message: Message) {
-	const channel = message.channel;
-
-	const info = new BanEmbed({
-		ban: {
-			user: message.author,
-			guild: message.guild,
-		} as GuildBan, // Hack for testing
-		timestamp: message.createdAt,
-	});
-
-
-	const banBtn = new BanButton();
-
-	await channel.send({
-		embeds: [info],
-		// @ts-ignore This is a false positive.
-		components: [banBtn],
-	});
 }

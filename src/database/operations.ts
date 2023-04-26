@@ -21,7 +21,7 @@ export interface BanRow {
 	banned_by?: Snowflake;
 	guild_id: Snowflake;
 	id: number; // NOTE: Database row ID, not Discord ID.
-	reason?: string;
+	reason?: string | null;
 	user_id: Snowflake;
 }
 
@@ -43,17 +43,32 @@ type AddBanRow = Omit<BanRow, 'id'>;
 type AlertGuildRow = Required<Pick<GuildRow, 'id'|'alert_channel_id'>>;
 type DeletedUserRow = Omit<UserRow, 'created_at'> & Partial<UserRow>;
 type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
-type RemoveBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
+type FetchBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
 
 export async function addBan(ban: AddBanRow): Promise<void> {
 	await knex<AddBanRow>(Tables.BANS)
-		.insert(ban);
+		.insert({
+			...ban,
+			reason: ban.reason || null, // Avoids empty strings
+		})
+		.onConflict(['guild_id', 'user_id']).merge();
 }
 
-export async function removeBan(ban: RemoveBanRow): Promise<void> {
-	await knex<RemoveBanRow>(Tables.BANS)
+export async function getUserBan(ban: FetchBanRow): Promise<BanRow|undefined> {
+	return knex<BanRow>(Tables.BANS)
+		.first()
+		.where(ban);
+}
+
+export async function removeBan(ban: FetchBanRow): Promise<void> {
+	await knex<FetchBanRow>(Tables.BANS)
 		.delete()
 		.where(ban);
+}
+
+export async function getGuilds(): Promise<GuildRow[]> {
+	return knex<GuildRow>(Tables.GUILDS)
+		.select();
 }
 
 export async function upsertGuild(guild: GuildRow): Promise<void> {
