@@ -36,6 +36,8 @@ const client = new Discord.Client({
 client.on(Discord.Events.ClientReady, events.onReady);
 client.on(Discord.Events.GuildBanAdd, events.onMemberBanned);
 client.on(Discord.Events.GuildBanRemove, events.onMemberUnbanned);
+client.on(Discord.Events.GuildCreate, events.onGuildJoin);
+client.on(Discord.Events.GuildDelete, events.onGuildLeave);
 client.on(Discord.Events.InteractionCreate, events.onInteraction);
 client.on(Discord.Events.MessageCreate, events.testMessage);
 

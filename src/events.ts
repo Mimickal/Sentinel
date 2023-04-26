@@ -22,11 +22,51 @@ import { GuildRow } from './database';
 
 /**
  * Event handler for when the bot is logged in.
- *
  * Logs the bot user we logged in as.
  */
 export async function onReady(client: Client) {
 	console.info(`Logged in as ${client.user?.tag} (${client.user?.id})`);
+}
+
+/**
+ * Event handler for joining a Guild.
+ * Creates a record for the Guild in the database.
+ */
+export async function onGuildJoin(guild: Guild) {
+	console.log('Joined Guild');
+
+	const alertChannel = guild.systemChannel;
+	if (!alertChannel) {
+		console.warn('Guild has no alert channel and will not receive alerts.');
+	}
+
+	try {
+		await database.upsertGuild({
+			alert_channel_id: guild.systemChannel?.id,
+			id: guild.id,
+			joined_at: guild.joinedAt,
+			left_at: null,
+			name: guild.name,
+		});
+	} catch (err) {
+		console.error('Failed to add Guild to database', err);
+	}
+}
+
+/**
+ * Event handler for leaving a Guild.
+ * Updates the database row for this Guild with the time of leaving.
+ */
+export async function onGuildLeave(guild: Guild) {
+	console.log('Left Guild');
+	try {
+		await database.setGuildLeft({
+			id: guild.id,
+			left_at: new Date(Date.now()),
+		});
+	} catch (err) {
+		console.error('Failed to remove Guild from database', err);
+	}
 }
 
 /**
@@ -148,39 +188,3 @@ export async function testMessage(message: Message) {
 
 // Going to save each thing we test down here, so we can integrate them later.
 
-async function testGuildRemove(message: Message) {
-	const guild = message.guild!;
-
-	console.log('Left Guild');
-	try {
-		await database.setGuildLeft({
-			id: guild.id,
-			left_at: new Date(Date.now()),
-		});
-	} catch (err) {
-		console.error('Failed to remove Guild from database', (err as Error));
-	}
-}
-
-async function testGuildAdd(message: Message) {
-	const guild = message.guild!;
-
-	console.log('Joined Guild');
-
-	const alertChannel = guild.systemChannel;
-	if (!alertChannel){
-		console.log('Guild has no alert channel and will not receive alerts.');
-	}
-
-	try {
-		await database.upsertGuild({
-			alert_channel_id: guild.systemChannel?.id,
-			id: guild.id,
-			joined_at: guild.joinedAt,
-			left_at: null,
-			name: guild.name,
-		});
-	} catch (err) {
-		console.error('Failed to add Guild to database', (err as Error));
-	}
-}
