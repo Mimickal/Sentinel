@@ -11,10 +11,6 @@ node_modules/
 
 # Dev files
 *.swp
-dev-token
-*config.json
+dev*
+*.log
 todo
-
-# Output files
-output.log
-dev.sqlite3

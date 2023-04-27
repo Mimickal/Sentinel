@@ -1,0 +1,32 @@
+# Heuristic rules for calculating user suspicion.
+#
+# YOUR SPECIFIC RULES SHOULD BE KEPT PRIVATE, so people can't game them!
+#
+# "version" is the version number of these rules.
+# This version number is printed alongside every suspicious user report,
+# which allows reports to be correlated with the rules used to determine them.
+# Therefore, this version should be incremented every time the rules are changed.
+#
+# "rules" is an array of objects with the following structure keys:
+#
+#   path:
+#   The path of the property to access, starting at "member".
+#   You can define multiple rules for one path.
+#   example: member.user.avatar
+#
+#   value:
+#   The accessed property is checked against this value. If the values match,
+#   the score is applied. If the property is a function, the function is called.
+#   The property (or returned value) will be casted to match this value's type.
+#   This can also be given as an object containing a "min" and a "max" field.
+#   In this case, the min and max must both be numbers.
+#
+#   score:
+#   The number added to the overall suspicion score. This value can be positive
+#   or negative.
+#   This can also be given as an object containing a "min" and a "max" field.
+#   In this case, "value" must also be using "min" and "max", and the score
+#   will be applied as a range based on "value".
+---
+version: 1
+rules: []
