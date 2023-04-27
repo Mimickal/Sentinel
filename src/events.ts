@@ -93,17 +93,17 @@ export async function onInteraction(interaction: BaseInteraction) {
 export async function onMemberBanned(ban: GuildBan) {
 	// Ban doesn't have a timestamp, so we use our own. Close enough.
 	const bannedAt = new Date(Date.now());
-
-	await addBannedUser({ ban, bannedAt });
+	const banId = await addBannedUser({ ban, bannedAt });
 
 	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
+	// TODO use constant for this name
 	if (ban.reason?.startsWith('Sentinel')) return;
 
 	const guilds = await database.getGuilds();
 	for await (const guild of guilds) {
 		try {
 			await sendBanAlert({
-				ban, bannedAt, guild,
+				ban, bannedAt, banId, guild,
 			});
 		} catch (err) {
 			console.warn('Failed to send ban alert to Guild', err);
@@ -114,7 +114,7 @@ export async function onMemberBanned(ban: GuildBan) {
 async function addBannedUser({ ban, bannedAt }: {
 	ban: GuildBan;
 	bannedAt: Date;
-}): Promise<void> {
+}): Promise<number | undefined> {
 	try {
 		await database.addUser({
 			id: ban.user.id,
@@ -122,29 +122,33 @@ async function addBannedUser({ ban, bannedAt }: {
 			deleted: false,
 		});
 
-		await database.addBan({
+		const banId = await database.addBan({
 			banned_at: bannedAt,
 			guild_id: ban.guild?.id,
 			reason: ban.reason,
 			user_id: ban.user?.id,
 		});
+
+		return banId;
 	} catch (err) {
 		console.error('Failed to add ban to database', err);
 	}
 }
 
-async function sendBanAlert({ ban, bannedAt, guild }: {
+async function sendBanAlert({ ban, bannedAt, banId, guild }: {
 	ban: GuildBan;
 	bannedAt: Date;
+	banId: number | undefined;
 	guild: GuildRow;
 }): Promise<void> {
 	// Don't sent alert to the guild the ban came from.
 	if (guild.id === ban.guild.id) return;
 	if (!guild.alert_channel_id) return;
 
+	// Don't send alert if user is already banned in this guild.
 	const existingBan = await database.getUserBan({
 		guild_id: guild.id,
-		user_id: ban.user.id
+		user_id: ban.user.id,
 	});
 	if (existingBan) return;
 
@@ -159,7 +163,7 @@ async function sendBanAlert({ ban, bannedAt, guild }: {
 			timestamp: bannedAt,
 		})],
 		// @ts-ignore TODO ask djs support why this type isn't playing nice.
-		components: [new BanButton()],
+		components: [new BanButton({ userId: ban.user.id, banId })],
 	});
 }
 

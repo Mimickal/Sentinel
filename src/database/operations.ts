@@ -45,13 +45,15 @@ type DeletedUserRow = Omit<UserRow, 'created_at'> & Partial<UserRow>;
 type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
 type FetchBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
 
-export async function addBan(ban: AddBanRow): Promise<void> {
-	await knex<AddBanRow>(Tables.BANS)
+export async function addBan(ban: AddBanRow): Promise<number> {
+	const returned = await knex<BanRow>(Tables.BANS)
 		.insert({
 			...ban,
 			reason: ban.reason || null, // Avoids empty strings
 		})
+		.returning('id')
 		.onConflict(['guild_id', 'user_id']).merge();
+	return returned[0].id;
 }
 
 export async function getUserBan(ban: FetchBanRow): Promise<BanRow|undefined> {
