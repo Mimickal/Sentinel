@@ -66,11 +66,11 @@ export class BanButton extends ActionRowBuilder {
 interface BanEmbedProps {
 	ban: GuildBan;
 	timestamp: Date;
+	inGuildSince?: Date;
 };
 
 export class BanEmbed extends EmbedBuilder {
-
-	constructor({ ban, timestamp}: BanEmbedProps) {
+	constructor({ ban, timestamp, inGuildSince }: BanEmbedProps) {
 		super();
 
 		const { guild, user } = ban;
@@ -86,6 +86,11 @@ export class BanEmbed extends EmbedBuilder {
 				inline: true,
 			})
 			.addFields({ name: 'User ID', value: user.id, inline: true })
+			.addFields({
+				name: `${inGuildSince ? '' : 'Not '} In Your Server`,
+				value: inGuildSince ? formatDistance(Date.now(), inGuildSince) : ' ',
+				inline: true,
+			})
 			.setFooter({ text: guild.name, iconURL: guild.iconURL() || undefined })
 			.setTimestamp(timestamp);
 

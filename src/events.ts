@@ -99,11 +99,11 @@ export async function onMemberBanned(ban: GuildBan) {
 	// TODO use constant for this name
 	if (ban.reason?.startsWith('Sentinel')) return;
 
-	const guilds = await database.getGuilds();
-	for await (const guild of guilds) {
+	const guildRows = await database.getGuilds();
+	for await (const guildRow of guildRows) {
 		try {
 			await sendBanAlert({
-				ban, bannedAt, banId, guild,
+				ban, bannedAt, banId, guildRow,
 			});
 		} catch (err) {
 			console.warn('Failed to send ban alert to Guild', err);
@@ -135,32 +135,39 @@ async function addBannedUser({ ban, bannedAt }: {
 	}
 }
 
-async function sendBanAlert({ ban, bannedAt, banId, guild }: {
+async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	ban: GuildBan;
 	bannedAt: Date;
 	banId: number | undefined;
-	guild: GuildRow;
+	guildRow: GuildRow;
 }): Promise<void> {
 	// Don't sent alert to the guild the ban came from.
-	if (guild.id === ban.guild.id) return;
-	if (!guild.alert_channel_id) return;
+	if (guildRow.id === ban.guild.id) return;
+	if (!guildRow.alert_channel_id) return;
 
 	// Don't send alert if user is already banned in this guild.
 	const existingBan = await database.getUserBan({
-		guild_id: guild.id,
+		guild_id: guildRow.id,
 		user_id: ban.user.id,
 	});
 	if (existingBan) return;
 
-	const channel = await ban.client.channels.fetch(guild.alert_channel_id);
+	const channel = await ban.client.channels.fetch(guildRow.alert_channel_id);
 	if (!channel?.isTextBased()) {
-		throw new Error(`Invalid channel ${guild.alert_channel_id}`);
+		throw new Error(`Invalid channel ${guildRow.alert_channel_id}`);
 	}
+
+	const guild = await ban.client.guilds.fetch(guildRow.id);
+	let inGuildSince: Date | undefined;
+	try {
+		inGuildSince = (await guild.members.fetch(ban.user.id)).joinedAt ?? undefined;
+	} catch {} // Throws an error if member is not in Guild.
 
 	await channel.send({
 		embeds: [new BanEmbed({
 			ban: ban,
 			timestamp: bannedAt,
+			inGuildSince: inGuildSince,
 		})],
 		// @ts-ignore TODO ask djs support why this type isn't playing nice.
 		components: [new BanButton({ userId: ban.user.id, banId })],
