@@ -22,6 +22,7 @@ export interface BanRow {
 	guild_id: Snowflake;
 	id: number; // NOTE: Database row ID, not Discord ID.
 	reason?: string | null;
+	ref_ban_id?: number;
 	user_id: Snowflake;
 }
 
@@ -40,6 +41,7 @@ export interface UserRow {
 }
 
 type AddBanRow = Omit<BanRow, 'id'>;
+type AddUserRow = Omit<UserRow, 'deleted'>;
 type AlertGuildRow = Required<Pick<GuildRow, 'id'|'alert_channel_id'>>;
 type DeletedUserRow = Omit<UserRow, 'created_at'> & Partial<UserRow>;
 type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
@@ -49,7 +51,7 @@ export async function addBan(ban: AddBanRow): Promise<number> {
 	const returned = await knex<BanRow>(Tables.BANS)
 		.insert({
 			...ban,
-			reason: ban.reason || null, // Avoids empty strings
+			reason: ban.reason || undefined, // Avoids empty strings
 		})
 		.returning('id')
 		.onConflict(['guild_id', 'user_id']).merge();
@@ -91,8 +93,8 @@ export async function setGuildLeft(guild: LeftGuildRow): Promise<void> {
 		.where('id', '=', guild.id);
 }
 
-export async function addUser(user: UserRow): Promise<void> {
-	await knex<UserRow>(Tables.USERS)
+export async function addUser(user: AddUserRow): Promise<void> {
+	await knex<AddUserRow>(Tables.USERS)
 		.insert(user)
 		.onConflict('id').ignore();
 }

@@ -38,6 +38,7 @@ exports.up = async function(knex) {
 		table.increments('id'               ).primary();
 		table.string    ('user_id',   ID_LEN).references('id').inTable(USERS);
 		table.string    ('guild_id',  ID_LEN).references('id').inTable(GUILDS);
+		table.string    ('ref_ban_id'       ).references('id').inTable(BANS);
 		table.string    ('banned_by', ID_LEN).nullable();
 		table.string    ('reason',    512   ).nullable();
 		table.timestamp ('banned_at'        ).defaultTo(knex.fn.now());

@@ -13,10 +13,17 @@ import {
 	Guild,
 	GuildBan,
 	Message,
+	userMention,
 } from 'discord.js';
 
 import commands from './commands';
-import { BanEmbed, BanButton } from './components';
+import {
+	BanEmbed,
+	BanButton,
+	ErrorReply,
+	GoodReply,
+	InfoReply,
+} from './components';
 import * as database from './database';
 import { GuildRow } from './database';
 
@@ -93,7 +100,12 @@ export async function onInteraction(interaction: BaseInteraction) {
 export async function onMemberBanned(ban: GuildBan) {
 	// Ban doesn't have a timestamp, so we use our own. Close enough.
 	const bannedAt = new Date(Date.now());
-	const banId = await addBannedUser({ ban, bannedAt });
+	const banId = await addBannedUser({
+		bannedAt,
+		guildId: ban.guild.id,
+		userId: ban.user.id,
+		reason: ban.reason,
+	});
 
 	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
 	// TODO use constant for this name
@@ -111,22 +123,25 @@ export async function onMemberBanned(ban: GuildBan) {
 	}
 }
 
-async function addBannedUser({ ban, bannedAt }: {
-	ban: GuildBan;
+async function addBannedUser({ bannedAt, guildId, userId, reason, refId }: {
 	bannedAt: Date;
+	guildId: string;
+	userId: string;
+	reason?: string | null;
+	refId?: number;
 }): Promise<number | undefined> {
 	try {
 		await database.addUser({
-			id: ban.user.id,
+			id: userId,
 			created_at: bannedAt,
-			deleted: false,
 		});
 
 		const banId = await database.addBan({
 			banned_at: bannedAt,
-			guild_id: ban.guild?.id,
-			reason: ban.reason,
-			user_id: ban.user?.id,
+			guild_id: guildId,
+			reason: reason,
+			user_id: userId,
+			ref_ban_id: refId,
 		});
 
 		return banId;
@@ -181,9 +196,44 @@ export async function onMemberUnbanned(ban: GuildBan) {
 
 /** Handler for a button press. */
 async function handleButtonInteraction(interaction: ButtonInteraction) {
-	if (interaction.customId !== BanButton.ID) return;
+	if (!BanButton.isButtonId(interaction.customId)) {
+		console.warn('Unrecognized button interaction:', interaction.customId);
+		return;
+	}
 
-	console.log('Pressed the button');
+	const guild = interaction.guild;
+	if (!guild) return;
+
+	const { userId, banId } = BanButton.getBanIds(interaction.customId)!;
+
+	const existingBan = await database.getUserBan({
+		guild_id: guild.id,
+		user_id: userId,
+	});
+	if (existingBan) {
+		return interaction.reply(InfoReply('User already banned'));
+	}
+
+	console.log('Button banning User in Guild');
+	// TODO Bring "Sentinel" name somewhere controlled
+	const reason = 'Sentinel: Confirmed by admin';
+
+	try {
+		await guild.bans.create(userId, { reason });
+	} catch (err) {
+		return interaction.reply(ErrorReply('Cannot ban user. Do I have the right permissions?'));
+	}
+
+	// The ban event will also call this, but we need to set refId here.
+	await addBannedUser({
+		bannedAt: new Date(Date.now()),
+		guildId: guild.id,
+		reason: reason,
+		refId: banId,
+		userId: userId,
+	});
+
+	await interaction.reply(GoodReply(`Banned user ${userMention(userId)}`));
 }
 
 /** This is for testing, because sending a message is much easier than banning. */

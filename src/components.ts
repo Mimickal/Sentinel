@@ -9,6 +9,7 @@
 import { formatDistance } from 'date-fns';
 import {
 	bold,
+	BaseMessageOptions,
 	Colors,
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -62,6 +63,18 @@ export class BanButton extends ActionRowBuilder {
 		);
 	}
 }
+
+export const ErrorReply = (message: string): BaseMessageOptions => ({
+	content: `:x: ${message}`,
+});
+
+export const InfoReply = (message: string): BaseMessageOptions => ({
+	content: `:information_source: ${message}`,
+});
+
+export const GoodReply = (message: string): BaseMessageOptions => ({
+	content: `:white_check_mark: ${message}`,
+});
 
 interface BanEmbedProps {
 	ban: GuildBan;
