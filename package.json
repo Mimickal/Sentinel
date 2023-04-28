@@ -11,6 +11,7 @@
   "main": "src/main.ts",
   "scripts": {
     "knex": "npx knex --knexfile src/database/knexfile.js",
+    "register": "npx ts-node --logError ./src/register.ts",
     "start": "npx ts-node --logError . dev-config.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

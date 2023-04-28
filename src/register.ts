@@ -9,7 +9,7 @@
 // All that effort writing the registration script in discord-command-registry
 // just to need to do this anyway because TypeScript. lol.
 import commands from './commands';
-const CONFIG = require('../dev-config.json');
+import { CONFIG } from './config';
 
 commands.registerCommands({
 	application_id: CONFIG.app,

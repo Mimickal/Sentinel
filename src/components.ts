@@ -17,6 +17,7 @@ import {
 	EmbedBuilder,
 	GuildBan,
 	InteractionReplyOptions,
+	MessageEditOptions,
 } from 'discord.js';
 
 interface BanIds {
@@ -80,6 +81,22 @@ export const InfoReply = (message: string): BaseMessageOptions => ({
 
 export const GoodReply = (message: string): BaseMessageOptions => ({
 	content: `:white_check_mark: ${message}`,
+});
+
+interface FileReplyProps {
+	data: unknown;
+	name: string;
+	message?: string;
+}
+
+export const FileReply = ({
+	data, name, message
+}: FileReplyProps): MessageEditOptions => ({
+	...(message ? GoodReply(message) : {}),
+	files: [{
+		name: name,
+		attachment: Buffer.from(JSON.stringify(data, null, 2)),
+	}],
 });
 
 interface BanEmbedProps {

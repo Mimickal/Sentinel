@@ -9,8 +9,9 @@
 import { bold, ChannelType, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandRegistry } from 'discord-command-registry';
 
-import { EphemReply } from './components';
+import { EphemReply, ErrorReply, FileReply, InfoReply } from './components';
 import * as database from './database';
+import { getGuildBanData } from './export';
 
 const PACKAGE = require('../package.json');
 
@@ -32,7 +33,18 @@ export default new SlashCommandRegistry()
 			.setDescription('The channel to send bot alerts')
 			.setRequired(true)
 		)
-	);
+	)
+	.addCommand(command => command
+		.setName('export-bans')
+		.setDescription('Exports bans to a file')
+		.setHandler(exportGuildBans)
+		.addStringOption(option => option
+			.setName('pattern')
+			.setDescription('Only export bans whose reason matches this pattern. Allows regex.')
+			.setRequired(false)
+		)
+	)
+	;
 
 /**
  * Replies with info about this bot, including a link to the source code to be
@@ -74,4 +86,32 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 	}
 
 	return interaction.reply(EphemReply(`Now sending alerts to ${channel}`));
+}
+
+/**
+ * Exports Bans for a Guild to a JSON file, then posts it in the Guild.
+ */
+async function exportGuildBans(interaction: ChatInputCommandInteraction): Promise<unknown> {
+	if (!interaction.inGuild() && !interaction.isChatInputCommand()) return;
+
+	const filter = interaction.options.getString('pattern') ?? undefined;
+	const guild = interaction.guild!; // Above check guarantees this value.
+
+	console.log('Building ban list for Guild');
+	await interaction.reply(InfoReply('Building ban list...'));
+
+	try {
+		const banData = await getGuildBanData(guild, filter);
+
+		await interaction.editReply(FileReply({
+			message: 'Ban list successfully exported',
+			name: `banlist-${guild.id}.json`,
+			data: banData,
+		}));
+	} catch (err) {
+		console.error('Failed to build ban list', err);
+		await interaction.editReply(ErrorReply(
+			'Failed to build ban list. Do I have permission to read the ban list?'
+		));
+	}
 }

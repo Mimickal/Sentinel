@@ -99,6 +99,12 @@ export async function addUser(user: AddUserRow): Promise<void> {
 		.onConflict('id').ignore();
 }
 
+export async function getUser(id: Snowflake): Promise<UserRow | undefined> {
+	return knex<UserRow>(Tables.USERS)
+		.first()
+		.where('id', '=', id);
+}
+
 export async function setUserDeleted(user: DeletedUserRow): Promise<void> {
 	await knex<DeletedUserRow>(Tables.USERS)
 		.update('deleted', user.deleted)
