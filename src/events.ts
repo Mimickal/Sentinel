@@ -21,9 +21,9 @@ import { APP_NAME } from './config';
 import {
 	BanEmbed,
 	BanButton,
-	ErrorReply,
-	GoodReply,
-	InfoReply,
+	ErrorMsg,
+	GoodMsg,
+	InfoMsg,
 } from './components';
 import * as database from './database';
 import { GuildRow } from './database';
@@ -219,7 +219,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 		user_id: userId,
 	});
 	if (existingBan) {
-		return interaction.reply(InfoReply('User already banned'));
+		return interaction.reply(InfoMsg('User already banned'));
 	}
 
 	console.log('Button banning User in Guild');
@@ -228,7 +228,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 	try {
 		await guild.bans.create(userId, { reason });
 	} catch (err) {
-		return interaction.reply(ErrorReply('Cannot ban user. Do I have the right permissions?'));
+		return interaction.reply(ErrorMsg('Cannot ban user. Do I have the right permissions?'));
 	}
 
 	// The ban event will also call this, but we need to set refId here.
@@ -240,7 +240,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 		userId: userId,
 	});
 
-	await interaction.reply(GoodReply(`Banned user ${userMention(userId)}`));
+	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
 }
 
 /** This is for testing, because sending a message is much easier than banning. */

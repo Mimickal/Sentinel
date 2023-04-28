@@ -66,33 +66,29 @@ export class BanButton extends ActionRowBuilder {
 	}
 }
 
-export const EphemReply = (message: string): InteractionReplyOptions => ({
-	content: message,
+export const ErrorMsg = (content: string): BaseMessageOptions => ({
+	content: `:x: ${content}`,
+});
+
+export const InfoMsg = (content: string): BaseMessageOptions => ({
+	content: `:information_source: ${content}`,
+});
+
+export const GoodMsg = (content: string): BaseMessageOptions => ({
+	content: `:white_check_mark: ${content}`,
+});
+
+export const EphemReply = (content: string | BaseMessageOptions): InteractionReplyOptions => ({
+	...packMessage(content),
 	ephemeral: true,
 });
 
-export const ErrorReply = (message: string): BaseMessageOptions => ({
-	content: `:x: ${message}`,
-});
-
-export const InfoReply = (message: string): BaseMessageOptions => ({
-	content: `:information_source: ${message}`,
-});
-
-export const GoodReply = (message: string): BaseMessageOptions => ({
-	content: `:white_check_mark: ${message}`,
-});
-
-interface FileReplyProps {
+export const FileReply = ({ data, name, content }: {
 	data: unknown;
 	name: string;
-	message?: string;
-}
-
-export const FileReply = ({
-	data, name, message
-}: FileReplyProps): MessageEditOptions => ({
-	...(message ? GoodReply(message) : {}),
+	content?: string | BaseMessageOptions;
+}): MessageEditOptions => ({
+	...packMessage(content),
 	files: [{
 		name: name,
 		attachment: Buffer.from(JSON.stringify(data, null, 2)),
@@ -134,4 +130,9 @@ export class BanEmbed extends EmbedBuilder {
 			this.addFields({ name: 'Reason', value: ban.reason });
 		}
 	}
+}
+
+// Handles optionally packing a raw string into BaseMessageOptions.
+function packMessage(content?: string | BaseMessageOptions): BaseMessageOptions {
+	return typeof content === 'object' ? content : { content };
 }

@@ -9,7 +9,7 @@
 import { bold, ChannelType, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandRegistry } from 'discord-command-registry';
 
-import { EphemReply, ErrorReply, FileReply, InfoReply } from './components';
+import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import * as database from './database';
 import { getGuildBanData } from './export';
 
@@ -70,10 +70,9 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 		ChannelType.PrivateThread,
 		ChannelType.PublicThread,
 	].includes(channel!.type)) {
-		return await interaction.reply({
-			content: `Cannot use channel ${channel}! Please use a text channel.`,
-			ephemeral: true,
-		});
+		return await interaction.reply(EphemReply(ErrorMsg(
+			`Cannot use channel ${channel}! Please use a text channel.`
+		)));
 	}
 
 	try {
@@ -83,9 +82,12 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 		});
 	} catch (err) {
 		console.error('Failed to set Guild alert channel in database', (err as Error));
+		return await interaction.reply(EphemReply(ErrorMsg(
+			`Failed to set alert channel. Try again?`,
+		)));
 	}
 
-	return interaction.reply(EphemReply(`Now sending alerts to ${channel}`));
+	return interaction.reply(GoodMsg(`Now sending alerts to ${channel}`));
 }
 
 /**
@@ -98,19 +100,19 @@ async function exportGuildBans(interaction: ChatInputCommandInteraction): Promis
 	const guild = interaction.guild!; // Above check guarantees this value.
 
 	console.log('Building ban list for Guild');
-	await interaction.reply(InfoReply('Building ban list...'));
+	await interaction.reply(InfoMsg('Building ban list...'));
 
 	try {
 		const banData = await getGuildBanData(guild, filter);
 
 		await interaction.editReply(FileReply({
-			message: 'Ban list successfully exported',
+			content: GoodMsg('Ban list successfully exported'),
 			name: `banlist-${guild.id}.json`,
 			data: banData,
 		}));
 	} catch (err) {
 		console.error('Failed to build ban list', err);
-		await interaction.editReply(ErrorReply(
+		await interaction.editReply(ErrorMsg(
 			'Failed to build ban list. Do I have permission to read the ban list?'
 		));
 	}
