@@ -191,7 +191,15 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 
 /** Event handler for a Guild Member being unbanned. */
 export async function onMemberUnbanned(ban: GuildBan) {
-
+	try {
+		await database.removeBan({
+			guild_id: ban.guild.id,
+			user_id: ban.user.id,
+		});
+	} catch (err) {
+		console.error('Failed to remove ban from database', err);
+	}
+	// TODO do we want to alert other servers?
 }
 
 /** Handler for a button press. */
