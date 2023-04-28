@@ -17,6 +17,7 @@ import {
 } from 'discord.js';
 
 import commands from './commands';
+import { APP_NAME } from './config';
 import {
 	BanEmbed,
 	BanButton,
@@ -108,8 +109,7 @@ export async function onMemberBanned(ban: GuildBan) {
 	});
 
 	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
-	// TODO use constant for this name
-	if (ban.reason?.startsWith('Sentinel')) return;
+	if (ban.reason?.startsWith(APP_NAME)) return;
 
 	const guildRows = await database.getGuilds();
 	for await (const guildRow of guildRows) {
@@ -223,8 +223,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 	}
 
 	console.log('Button banning User in Guild');
-	// TODO Bring "Sentinel" name somewhere controlled
-	const reason = 'Sentinel: Confirmed by admin';
+	const reason = `${APP_NAME}: Confirmed by admin`;
 
 	try {
 		await guild.bans.create(userId, { reason });

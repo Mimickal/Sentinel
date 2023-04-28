@@ -8,9 +8,9 @@
  ******************************************************************************/
 import * as Discord from 'discord.js';
 
+import { CONFIG } from './config';
 import * as events from './events';
 
-const CONFIG = require('../dev-config.json');
 const PACKAGE = require('../package-lock.json');
 
 // Everything operates on IDs, so we can safely rely on partials.
