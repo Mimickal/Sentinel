@@ -6,6 +6,12 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
+
+// This would have been cool, but Discord's bot API doesn't really give us
+// enough information to do anything reasonable here.
+// It's really just account age checking. Might finish this anyway so people
+// don't need bots for account age, but it's low priority.
+
 import { readFileSync } from 'fs';
 
 import { GuildMember } from 'discord.js';
@@ -58,7 +64,7 @@ export default class Suspicion {
 	}
 
 	#applyRule(member: GuildMember, rule: Rule): number {
-		return 0; // TODO
+		return 0; // TODO implement scoring
 	}
 
 	static #loadConfigFromFile(path: string): Config {
