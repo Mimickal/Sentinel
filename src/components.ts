@@ -16,6 +16,7 @@ import {
 	ButtonStyle,
 	EmbedBuilder,
 	GuildBan,
+	InteractionReplyOptions,
 } from 'discord.js';
 
 interface BanIds {
@@ -63,6 +64,11 @@ export class BanButton extends ActionRowBuilder {
 		);
 	}
 }
+
+export const EphemReply = (message: string): InteractionReplyOptions => ({
+	content: message,
+	ephemeral: true,
+});
 
 export const ErrorReply = (message: string): BaseMessageOptions => ({
 	content: `:x: ${message}`,

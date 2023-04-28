@@ -9,6 +9,7 @@
 import { bold, ChannelType, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandRegistry } from 'discord-command-registry';
 
+import { EphemReply } from './components';
 import * as database from './database';
 
 const PACKAGE = require('../package.json');
@@ -49,9 +50,7 @@ async function cmdInfo(interaction: ChatInputCommandInteraction): Promise<void> 
  * Sets a Guild's alert channel.
  */
 async function setAlertChannel(interaction: ChatInputCommandInteraction): Promise<unknown> {
-	if (!interaction.inGuild() && !interaction.isChatInputCommand()) {
-		return;
-	}
+	if (!interaction.inGuild() && !interaction.isChatInputCommand()) return;
 
 	const channel = interaction.options.getChannel('channel');
 	if (![
@@ -74,8 +73,5 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 		console.error('Failed to set Guild alert channel in database', (err as Error));
 	}
 
-	return interaction.reply({
-		content: `Now sending alerts to ${channel}`,
-		ephemeral: true,
-	});
+	return interaction.reply(EphemReply(`Now sending alerts to ${channel}`));
 }
