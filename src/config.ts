@@ -12,10 +12,11 @@ interface Config {
 	app: string;
 	token: string;
 	guild?: string;
+	database?: string;
 }
 
 const REQUIRED_KEYS: (keyof Config)[] = ['app', 'token'];
-const OPTIONAL_KEYS: (keyof Config)[] = ['guild'];
+const OPTIONAL_KEYS: (keyof Config)[] = ['guild', 'database'];
 const ALL_KEYS = new Set([...REQUIRED_KEYS, ...OPTIONAL_KEYS]);
 
 const configFile = process.argv[2];
@@ -24,6 +25,9 @@ if (!configFile) {
 	process.exit(0);
 }
 const config = require(resolve(configFile));
+
+// Defined in knexfile.js
+config['database'] = process.env.SENTINEL_DATABASE;
 
 REQUIRED_KEYS.forEach(key => {
 	if (config[key] == null)

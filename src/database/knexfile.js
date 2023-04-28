@@ -6,7 +6,7 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-const { join } = require('path');
+const { join, resolve } = require('path');
 
 const sharedSqliteSettings = {
 	client: 'sqlite3',
@@ -33,6 +33,9 @@ module.exports = {
 
 	production: {
 		...sharedSqliteSettings,
-		...sqlite3Connection('../../prod.sqlite3') // TODO get this from somewhere else.
+		...sqlite3Connection(process.env.SENTINEL_DATABASE
+				? resolve(process.env.SENTINEL_DATABASE)
+				: '/srv/discord/sentinel.sqlite3'
+		),
 	},
 };
