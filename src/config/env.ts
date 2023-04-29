@@ -26,7 +26,7 @@ if (!configFile) {
 }
 const config = require(resolve(configFile));
 
-// Defined in knexfile.js
+// Defined in database/knexfile.js
 config['database'] = process.env.SENTINEL_DATABASE;
 
 REQUIRED_KEYS.forEach(key => {
@@ -42,7 +42,7 @@ if (extraKeys.length > 0)
 
 export const APP_NAME = 'Sentinel';
 // Can do this goofy typecast because we validate all these keys exist above.
-export const CONFIG: Config = Array.from(ALL_KEYS).reduce(
+export const Env: Config = Array.from(ALL_KEYS).reduce(
 	(obj: Partial<Config>, key) => {
 	obj[key] = config[key];
 	return obj;

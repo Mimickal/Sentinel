@@ -15,8 +15,7 @@ import {
 import { SlashCommandRegistry } from 'discord-command-registry';
 
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
-import * as database from './database';
-import GuildConfig from './guildconf';
+import { APP_NAME, GuildConfig } from './config';
 
 type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
 

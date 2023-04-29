@@ -11,10 +11,10 @@
 
 import { Snowflake } from 'discord.js';
 
-import * as database from './database';
+import * as database from '../database';
 
-export type ConfigKey = 'alertChannelId';
-type ConfRecord = Map<ConfigKey, string | null>;
+export type GuildConfigKey = 'alertChannelId';
+type ConfRecord = Map<GuildConfigKey, string | null>;
 
 /** Bot configuration for an individual Guild. */
 export default class GuildConfig {

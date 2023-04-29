@@ -8,7 +8,7 @@
  ******************************************************************************/
 import { Snowflake } from 'discord.js';
 
-import { ConfigKey } from '../guildconf';
+import { GuildConfigKey } from '../config';
 import knex from './knex_env';
 
 enum Tables {
@@ -35,7 +35,7 @@ export interface BanRow {
 export interface ConfigRow {
 	id: RowId;
 	guild_id: Snowflake;
-	key: ConfigKey;
+	key: GuildConfigKey;
 	value: string | null;
 }
 

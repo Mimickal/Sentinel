@@ -24,10 +24,10 @@ import {
 	GoodMsg,
 	InfoMsg,
 } from './components';
-import { APP_NAME } from './config';
+import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { GuildRow } from './database';
-import GuildConfig from './guildconf';
+
 
 /**
  * Event handler for when the bot is logged in.

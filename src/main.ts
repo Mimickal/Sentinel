@@ -8,7 +8,7 @@
  ******************************************************************************/
 import * as Discord from 'discord.js';
 
-import { CONFIG } from './config';
+import * as config from './config';
 import * as events from './events';
 
 const PACKAGE = require('../package-lock.json');
@@ -42,11 +42,11 @@ client.on(Discord.Events.InteractionCreate, events.onInteraction);
 client.on(Discord.Events.MessageCreate, events.testMessage);
 
 console.info(`Bot is starting with config: ${JSON.stringify({
-	...CONFIG,
+	...config.Env,
 	token: '<REDACTED>',
 })}`);
 
-client.login(CONFIG.token).catch(err => {
+client.login(config.Env.token).catch(err => {
 	console.error('Failed to log in!', err);
 	process.exit(1);
 });
