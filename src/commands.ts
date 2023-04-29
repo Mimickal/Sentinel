@@ -12,6 +12,7 @@ import {
 	ChatInputCommandInteraction,
 	PermissionFlagsBits,
 } from 'discord.js';
+// @ts-ignore
 import { SlashCommandRegistry } from 'discord-command-registry';
 
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
@@ -21,6 +22,7 @@ type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
 
 // Ok guys, I get it. I'll port this library to TypeScript soon (TM).
 export default new SlashCommandRegistry()
+	// @ts-ignore
 	.addCommand(command => command
 		.setName('info')
 		.setDescription(
@@ -28,22 +30,26 @@ export default new SlashCommandRegistry()
 		)
 		.setHandler(cmdInfo)
 	)
+	// @ts-ignore
 	.addCommand(command => command
 		.setName('alert-channel')
 		.setDescription('Sets the channel to send bot alerts')
 		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
 		.setHandler(requireInGuild(setAlertChannel))
+		// @ts-ignore
 		.addChannelOption(option => option
 			.setName('channel')
 			.setDescription('The channel to send bot alerts')
 			.setRequired(true)
 		)
 	)
+	// @ts-ignore
 	.addCommand(command => command
 		.setName('export-bans')
 		.setDescription('Exports bans to a file')
 		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
 		.setHandler(requireInGuild(exportGuildBans))
+		// @ts-ignore
 		.addStringOption(option => option
 			.setName('pattern')
 			.setDescription('Only export bans whose reason matches this pattern. Allows regex.')
