@@ -6,6 +6,7 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
+import { parseJSON as parseJsonDate } from 'date-fns';
 import { Snowflake } from 'discord.js';
 
 import { GuildConfigKey } from '../config';
@@ -23,7 +24,7 @@ export type RowId = number;
 
 // Database row types
 export interface BanRow {
-	banned_at: Date;
+	banned_at?: Date;
 	banned_by?: Snowflake;
 	guild_id: Snowflake;
 	id: RowId;
@@ -71,10 +72,11 @@ export async function addBan(ban: AddBanRow): Promise<number> {
 	return returned[0].id;
 }
 
-export async function getUserBan(ban: FetchBanRow): Promise<BanRow|undefined> {
-	return knex<BanRow>(Tables.BANS)
+export async function getBan(ban: FetchBanRow): Promise<BanRow|undefined> {
+	const row = await knex<BanRow>(Tables.BANS)
 		.first()
 		.where(ban);
+	return parseDates(row, ['banned_at']);
 }
 
 export async function removeBan(ban: FetchBanRow): Promise<void> {
@@ -96,8 +98,9 @@ export async function setGuildConfigValue(config: SetConfigRow): Promise<void> {
 }
 
 export async function getGuilds(): Promise<GuildRow[]> {
-	return knex<GuildRow>(Tables.GUILDS)
+	const guildRows = await knex<GuildRow>(Tables.GUILDS)
 		.select();
+	return guildRows.map(row => parseDates(row, ['joined_at', 'left_at'])!)
 }
 
 export async function upsertGuild(guild: GuildRow): Promise<void> {
@@ -119,13 +122,39 @@ export async function addUser(user: AddUserRow): Promise<void> {
 }
 
 export async function getUser(id: Snowflake): Promise<UserRow | undefined> {
-	return knex<UserRow>(Tables.USERS)
+	const row = await knex<UserRow>(Tables.USERS)
 		.first()
 		.where('id', '=', id);
+	return parseDates(row, ['created_at']);
 }
 
 export async function setUserDeleted(user: DeletedUserRow): Promise<void> {
 	await knex<DeletedUserRow>(Tables.USERS)
 		.update('deleted', user.deleted)
 		.where('id', '=', user.id);
+}
+
+// Fields in T with (possibly optional) Date https://stackoverflow.com/a/49752227
+type DateKey<T> = keyof {
+	[K in keyof T as T[K] extends (Date | null | undefined) ? K : never]: any
+}
+
+/** Converts columns containing date data to actual {@link Date} objects. */
+function parseDates<T>(
+	row: T | undefined,
+	dateKeys: DateKey<T>[]
+): T | undefined {
+	if (!row) return;
+
+	dateKeys.forEach(key => {
+		// These are the possible values of a date column in the database.
+		const value = row[key] as number | string | null | undefined;
+
+		if (value != null) { // Intentional loose equality
+			// @ts-ignore The constraint on key makes this a safe assignment.
+			row[key] = parseJsonDate(value);
+		}
+	});
+
+	return row;
 }

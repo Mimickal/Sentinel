@@ -166,7 +166,7 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	if (!guildConfig.alertChannelId) return;
 
 	// Don't send alert if user is already banned in this guild.
-	const existingBan = await database.getUserBan({
+	const existingBan = await database.getBan({
 		guild_id: guildRow.id,
 		user_id: ban.user.id,
 	});
@@ -219,7 +219,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 
 	const { userId, banId } = BanButton.getBanIds(interaction.customId)!;
 
-	const existingBan = await database.getUserBan({
+	const existingBan = await database.getBan({
 		guild_id: guild.id,
 		user_id: userId,
 	});
