@@ -17,7 +17,6 @@ import {
 } from 'discord.js';
 
 import commands from './commands';
-import { APP_NAME } from './config';
 import {
 	BanEmbed,
 	BanButton,
@@ -25,8 +24,10 @@ import {
 	GoodMsg,
 	InfoMsg,
 } from './components';
+import { APP_NAME } from './config';
 import * as database from './database';
 import { GuildRow } from './database';
+import GuildConfig from './guildconf';
 
 /**
  * Event handler for when the bot is logged in.
@@ -50,12 +51,13 @@ export async function onGuildJoin(guild: Guild) {
 
 	try {
 		await database.upsertGuild({
-			alert_channel_id: guild.systemChannel?.id,
 			id: guild.id,
 			joined_at: guild.joinedAt,
 			left_at: null,
 			name: guild.name,
 		});
+		const guildConfig = await GuildConfig.for(guild.id);
+		guildConfig.setAlertChannel(alertChannel?.id);
 	} catch (err) {
 		console.error('Failed to add Guild to database', err);
 	}
@@ -156,9 +158,13 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	banId: number | undefined;
 	guildRow: GuildRow;
 }): Promise<void> {
-	// Don't sent alert to the guild the ban came from.
+	// Don't send alert to the guild the ban came from.
 	if (guildRow.id === ban.guild.id) return;
-	if (!guildRow.alert_channel_id) return;
+
+	const guildConfig = await GuildConfig.for(guildRow.id);
+
+	// Don't send alert if we, you know, can't.
+	if (!guildConfig.alertChannelId) return;
 
 	// Don't send alert if user is already banned in this guild.
 	const existingBan = await database.getUserBan({
@@ -167,9 +173,9 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	});
 	if (existingBan) return;
 
-	const channel = await ban.client.channels.fetch(guildRow.alert_channel_id);
+	const channel = await ban.client.channels.fetch(guildConfig.alertChannelId);
 	if (!channel?.isTextBased()) {
-		throw new Error(`Invalid channel ${guildRow.alert_channel_id}`);
+		throw new Error(`Invalid channel ${guildConfig.alertChannelId}`);
 	}
 
 	const guild = await ban.client.guilds.fetch(guildRow.id);

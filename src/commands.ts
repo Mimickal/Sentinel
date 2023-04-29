@@ -16,7 +16,7 @@ import { SlashCommandRegistry } from 'discord-command-registry';
 
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import * as database from './database';
-import { getGuildBanData } from './export';
+import GuildConfig from './guildconf';
 
 type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
 
@@ -92,10 +92,9 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 	}
 
 	try {
-		await database.setGuildAlertChannel({
-			id: interaction.guild!.id, // Above check guarantees guild is set.
-			alert_channel_id: channel!.id,
-		});
+		// Above check guarantees guild is set.
+		const guildConfig = await GuildConfig.for(interaction.guild!.id);
+		guildConfig.setAlertChannel(channel!.id);
 	} catch (err) {
 		console.error('Failed to set Guild alert channel in database', (err as Error));
 		await interaction.reply(EphemReply(ErrorMsg(

@@ -7,12 +7,16 @@
  * for more information.
  ******************************************************************************/
 
+// Table names
+const BANS   = 'bans';
+const CONFIG = 'config';
 const GUILDS = 'guilds';
-const USERS = 'users';
-const BANS = 'bans';
+const USERS  = 'users';
 
 /** Length of Discord ID. */
 const ID_LEN = 20;
+/** Length of Config key name. */
+const KEY_LEN = 50;
 
 /**
  * Sets up initial tables.
@@ -21,11 +25,20 @@ const ID_LEN = 20;
  */
 exports.up = async function(knex) {
 	await knex.schema.createTable(GUILDS, table => {
-		table.string   ('id',               ID_LEN).primary();
-		table.string   ('name',             100   ).notNullable();
-		table.string   ('alert_channel_id', ID_LEN).nullable();
-		table.timestamp('joined_at'               ).defaultTo(knex.fn.now());
-		table.timestamp('left_at'                 ).nullable();
+		table.string   ('id', ID_LEN).primary();
+		table.string   ('name',  100).notNullable();
+		table.timestamp('joined_at' ).defaultTo(knex.fn.now());
+		table.timestamp('left_at'   ).nullable();
+	});
+
+	await knex.schema.createTable(CONFIG, table => {
+		table.increments('id'              ).primary();
+		table.string    ('guild_id', ID_LEN).references('id').inTable(GUILDS);
+		table.string    ('key',     KEY_LEN).notNullable();
+		// Value type handled in database/operations.ts
+		table.string    ('value'           ).nullable();
+
+		table.unique(['guild_id', 'key']);
 	});
 
 	await knex.schema.createTable(USERS, table => {
@@ -55,5 +68,6 @@ exports.up = async function(knex) {
 exports.down = async function(knex) {
 	await knex.schema.dropTable(BANS);
 	await knex.schema.dropTable(USERS);
+	await knex.schema.dropTable(CONFIG);
 	await knex.schema.dropTable(GUILDS);
 };

@@ -6,28 +6,38 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
+import { Snowflake } from 'discord.js';
 import knex from './knex_env';
 
 enum Tables {
 	BANS = 'bans',
+	CONFIG = 'config',
 	GUILDS = 'guilds',
 	USERS = 'users',
 }
 
-export type Snowflake = string;
+// Type aliases for clarity
+export type RowId = number;
 
+// Database row types
 export interface BanRow {
 	banned_at: Date;
 	banned_by?: Snowflake;
 	guild_id: Snowflake;
-	id: number; // NOTE: Database row ID, not Discord ID.
+	id: RowId;
 	reason?: string | null;
 	ref_ban_id?: number;
 	user_id: Snowflake;
 }
 
+export interface ConfigRow {
+	id: RowId;
+	guild_id: Snowflake;
+	key: string;
+	value: string | null;
+}
+
 export interface GuildRow {
-	alert_channel_id?: Snowflake;
 	id: Snowflake;
 	joined_at: Date;
 	left_at?: Date | null;
@@ -40,12 +50,13 @@ export interface UserRow {
 	id: Snowflake;
 }
 
+// Row type constraints for individual operations
 type AddBanRow = Omit<BanRow, 'id'>;
 type AddUserRow = Omit<UserRow, 'deleted'>;
-type AlertGuildRow = Required<Pick<GuildRow, 'id'|'alert_channel_id'>>;
 type DeletedUserRow = Omit<UserRow, 'created_at'> & Partial<UserRow>;
 type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
 type FetchBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
+type SetConfigRow = Omit<ConfigRow, 'id'>;
 
 export async function addBan(ban: AddBanRow): Promise<number> {
 	const returned = await knex<BanRow>(Tables.BANS)
@@ -70,6 +81,23 @@ export async function removeBan(ban: FetchBanRow): Promise<void> {
 		.where(ban);
 }
 
+export async function getGuildConfig(id: Snowflake): Promise<Record<string, string>> {
+	const configRows = await knex<ConfigRow>(Tables.CONFIG)
+		.select()
+		.where('guild_id', '=', id);
+
+	return configRows.reduce((record, row) => {
+		record[row.key] = row.value;
+		return record;
+	}, {});
+}
+
+export async function setGuildConfigValue(config: SetConfigRow): Promise<void> {
+	await knex<SetConfigRow>(Tables.CONFIG)
+		.insert(config)
+		.onConflict(['guild_id', 'key']).merge();
+}
+
 export async function getGuilds(): Promise<GuildRow[]> {
 	return knex<GuildRow>(Tables.GUILDS)
 		.select();
@@ -79,12 +107,6 @@ export async function upsertGuild(guild: GuildRow): Promise<void> {
 	await knex<GuildRow>(Tables.GUILDS)
 		.insert(guild)
 		.onConflict('id').merge();
-}
-
-export async function setGuildAlertChannel(guild: AlertGuildRow): Promise<void> {
-	await knex<AlertGuildRow>(Tables.GUILDS)
-		.update('alert_channel_id', guild.alert_channel_id)
-		.where('id', '=', guild.id);
 }
 
 export async function setGuildLeft(guild: LeftGuildRow): Promise<void> {
