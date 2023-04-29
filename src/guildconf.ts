@@ -13,27 +13,25 @@ import { Snowflake } from 'discord.js';
 
 import * as database from './database';
 
-/**
- * Bot configuration for an individual Guild.
- *
- * Persists config changes to the database in the background. This allows
- * config to be accessed and set synchronously.
- */
+export type ConfigKey = 'alertChannelId';
+type ConfRecord = Map<ConfigKey, string | null>;
+
+/** Bot configuration for an individual Guild. */
 export default class GuildConfig {
 	static async for(guildId: Snowflake) {
-		const config = await database.getGuildConfig(guildId);
-		return new GuildConfig(guildId, config);
+		const configRows = await database.getGuildConfig(guildId);
+		return new GuildConfig(guildId, configRows.reduce<ConfRecord>(
+			(map, row) => map.set(row.key, row.value),
+			new Map()
+		));
 	}
 
 	#_alertChannelId: Snowflake | null;
 	#_guildId: Snowflake;
 
-	private constructor(
-		guildId: Snowflake,
-		config: Record<keyof Omit<GuildConfig, 'guildId'>, string>
-	) {
+	private constructor(guildId: Snowflake, config: ConfRecord) {
 		this.#_guildId = guildId;
-		this.#_alertChannelId = config.alertChannelId;
+		this.#_alertChannelId = config.get('alertChannelId') ?? null;
 	}
 
 	// NOTE: guildId is transient and read-only, so no "set guildId(...)"
@@ -51,22 +49,20 @@ export default class GuildConfig {
 
 	// END DANGER ZONE
 
-	setAlertChannel(channel: Snowflake | null | undefined) {
-		const channelId = channel ?? null;
-		this.#_alertChannelId = channelId;
-		void this.dispatch('alertChannelId', channelId);
+	static async setAlertChannel(
+		guildId: Snowflake,
+		channel: Snowflake | null | undefined
+	): Promise<void> {
+		return database.setGuildConfigValue({
+			guild_id: guildId,
+			key: 'alertChannelId',
+			value: channel ?? null,
+		});
 	}
 
-	/** Persists guild configuration changes to the database. */
-	private async dispatch(key: keyof GuildConfig, value: string | null) {
-		try {
-			await database.setGuildConfigValue({
-				guild_id: this.guildId,
-				key: key,
-				value: value,
-			});
-		} catch (err) {
-			console.error(`Failed to persist config "${key}" in Guild ${this.guildId}`, err);
-		}
+	async setAlertChannel(channel: Snowflake | null | undefined) {
+		const channelId = channel ?? null;
+		this.#_alertChannelId = channelId;
+		return GuildConfig.setAlertChannel(this.guildId, channelId);
 	}
 }

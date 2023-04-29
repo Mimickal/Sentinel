@@ -7,6 +7,8 @@
  * for more information.
  ******************************************************************************/
 import { Snowflake } from 'discord.js';
+
+import { ConfigKey } from '../guildconf';
 import knex from './knex_env';
 
 enum Tables {
@@ -33,7 +35,7 @@ export interface BanRow {
 export interface ConfigRow {
 	id: RowId;
 	guild_id: Snowflake;
-	key: string;
+	key: ConfigKey;
 	value: string | null;
 }
 
@@ -81,15 +83,10 @@ export async function removeBan(ban: FetchBanRow): Promise<void> {
 		.where(ban);
 }
 
-export async function getGuildConfig(id: Snowflake): Promise<Record<string, string>> {
-	const configRows = await knex<ConfigRow>(Tables.CONFIG)
+export async function getGuildConfig(id: Snowflake): Promise<ConfigRow[]> {
+	return await knex<ConfigRow>(Tables.CONFIG)
 		.select()
 		.where('guild_id', '=', id);
-
-	return configRows.reduce((record, row) => {
-		record[row.key] = row.value;
-		return record;
-	}, {});
 }
 
 export async function setGuildConfigValue(config: SetConfigRow): Promise<void> {

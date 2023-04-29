@@ -56,8 +56,7 @@ export async function onGuildJoin(guild: Guild) {
 			left_at: null,
 			name: guild.name,
 		});
-		const guildConfig = await GuildConfig.for(guild.id);
-		guildConfig.setAlertChannel(alertChannel?.id);
+		await GuildConfig.setAlertChannel(guild.id, alertChannel?.id);
 	} catch (err) {
 		console.error('Failed to add Guild to database', err);
 	}

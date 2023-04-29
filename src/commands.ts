@@ -92,9 +92,8 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 	}
 
 	try {
-		// Above check guarantees guild is set.
-		const guildConfig = await GuildConfig.for(interaction.guild!.id);
-		guildConfig.setAlertChannel(channel!.id);
+		// Above check guarantees these values are defined
+		await GuildConfig.setAlertChannel(interaction.guild!.id, channel!.id)
 	} catch (err) {
 		console.error('Failed to set Guild alert channel in database', (err as Error));
 		await interaction.reply(EphemReply(ErrorMsg(
