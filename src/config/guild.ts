@@ -6,9 +6,6 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-
-// TODO rename this and put it in config/ with config.ts
-
 import { Snowflake } from 'discord.js';
 
 import * as database from '../database';
