@@ -6,12 +6,15 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-import GuildConfig from './guild';
-import Package from './package';
+const {
+	description,
+	homepage,
+	version,
+} = require('../../package.json');
 
-export {
-	GuildConfig,
-	Package,
-};
-export * from './guild';
-export * from './env';
+const Package = {
+	description,
+	homepage,
+	version,
+} as const;
+export default Package;

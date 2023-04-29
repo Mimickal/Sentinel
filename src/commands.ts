@@ -15,11 +15,9 @@ import {
 import { SlashCommandRegistry } from 'discord-command-registry';
 
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
-import { APP_NAME, GuildConfig } from './config';
+import { APP_NAME, GuildConfig, Package } from './config';
 
 type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
-
-const PACKAGE = require('../package.json');
 
 // Ok guys, I get it. I'll port this library to TypeScript soon (TM).
 export default new SlashCommandRegistry()
@@ -68,9 +66,9 @@ function requireInGuild(func: Handler): Handler {
  */
 async function cmdInfo(interaction: ChatInputCommandInteraction): Promise<void> {
 	await interaction.reply([
-		PACKAGE.description,
-		`${bold('Running version:')} ${PACKAGE.version}`,
-		`${bold('Source code:')} ${PACKAGE.homepage}`,
+		Package.description,
+		`${bold('Running version:')} ${Package.version}`,
+		`${bold('Source code:')} ${Package.homepage}`,
 	].join('\n'));
 }
 

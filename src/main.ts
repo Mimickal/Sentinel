@@ -11,8 +11,6 @@ import * as Discord from 'discord.js';
 import * as config from './config';
 import * as events from './events';
 
-const PACKAGE = require('../package-lock.json');
-
 // Everything operates on IDs, so we can safely rely on partials.
 const client = new Discord.Client({
 	intents: [
@@ -27,7 +25,7 @@ const client = new Discord.Client({
 	],
 	presence: {
 		activities: [{
-			name: `Version ${PACKAGE.version}`,
+			name: `Version ${config.Package.version}`,
 			type: Discord.ActivityType.Playing,
 		}],
 	},
