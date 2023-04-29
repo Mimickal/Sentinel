@@ -6,12 +6,19 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-import { bold, ChannelType, ChatInputCommandInteraction } from 'discord.js';
+import {
+	bold,
+	ChannelType,
+	ChatInputCommandInteraction,
+	PermissionFlagsBits,
+} from 'discord.js';
 import { SlashCommandRegistry } from 'discord-command-registry';
 
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import * as database from './database';
 import { getGuildBanData } from './export';
+
+type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
 
 const PACKAGE = require('../package.json');
 
@@ -27,7 +34,8 @@ export default new SlashCommandRegistry()
 	.addCommand(command => command
 		.setName('alert-channel')
 		.setDescription('Sets the channel to send bot alerts')
-		.setHandler(setAlertChannel)
+		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+		.setHandler(requireInGuild(setAlertChannel))
 		.addChannelOption(option => option
 			.setName('channel')
 			.setDescription('The channel to send bot alerts')
@@ -37,14 +45,23 @@ export default new SlashCommandRegistry()
 	.addCommand(command => command
 		.setName('export-bans')
 		.setDescription('Exports bans to a file')
-		.setHandler(exportGuildBans)
+		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+		.setHandler(requireInGuild(exportGuildBans))
 		.addStringOption(option => option
 			.setName('pattern')
 			.setDescription('Only export bans whose reason matches this pattern. Allows regex.')
 			.setRequired(false)
 		)
 	)
-	;
+
+/** Middleware that ensures an interaction is a chat slash command in a Guild. */
+function requireInGuild(func: Handler): Handler {
+	return async (interaction) => {
+		if (!interaction.inGuild() && !interaction.isChatInputCommand()) return;
+
+		return func(interaction);
+	};
+}
 
 /**
  * Replies with info about this bot, including a link to the source code to be
@@ -61,18 +78,17 @@ async function cmdInfo(interaction: ChatInputCommandInteraction): Promise<void> 
 /**
  * Sets a Guild's alert channel.
  */
-async function setAlertChannel(interaction: ChatInputCommandInteraction): Promise<unknown> {
-	if (!interaction.inGuild() && !interaction.isChatInputCommand()) return;
-
+async function setAlertChannel(interaction: ChatInputCommandInteraction): Promise<void> {
 	const channel = interaction.options.getChannel('channel');
 	if (![
 		ChannelType.GuildText,
 		ChannelType.PrivateThread,
 		ChannelType.PublicThread,
 	].includes(channel!.type)) {
-		return await interaction.reply(EphemReply(ErrorMsg(
+		await interaction.reply(EphemReply(ErrorMsg(
 			`Cannot use channel ${channel}! Please use a text channel.`
 		)));
+		return;
 	}
 
 	try {
@@ -82,20 +98,19 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 		});
 	} catch (err) {
 		console.error('Failed to set Guild alert channel in database', (err as Error));
-		return await interaction.reply(EphemReply(ErrorMsg(
+		await interaction.reply(EphemReply(ErrorMsg(
 			`Failed to set alert channel. Try again?`,
 		)));
+		return;
 	}
 
-	return interaction.reply(GoodMsg(`Now sending alerts to ${channel}`));
+	await interaction.reply(GoodMsg(`Now sending alerts to ${channel}`));
 }
 
 /**
  * Exports Bans for a Guild to a JSON file, then posts it in the Guild.
  */
-async function exportGuildBans(interaction: ChatInputCommandInteraction): Promise<unknown> {
-	if (!interaction.inGuild() && !interaction.isChatInputCommand()) return;
-
+async function exportGuildBans(interaction: ChatInputCommandInteraction): Promise<void> {
 	const filter = interaction.options.getString('pattern') ?? undefined;
 	const guild = interaction.guild!; // Above check guarantees this value.
 
