@@ -37,15 +37,20 @@ export default new SlashCommandRegistry()
 	)
 	// @ts-ignore
 	.addCommand(command => command
-		.setName('alert-channel')
-		.setDescription('Sets the channel to send bot alerts')
+		.setName('config')
+		.setDescription('Change some configuration for the bot')
 		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-		.setHandler(requireInGuild(setAlertChannel))
 		// @ts-ignore
-		.addChannelOption(option => option
-			.setName('channel')
-			.setDescription('The channel to send bot alerts')
-			.setRequired(true)
+		.addSubcommand(subcommand => subcommand
+			.setName('alert-channel')
+			.setDescription('Sets the channel to send bot alerts')
+			.setHandler(requireInGuild(setAlertChannel))
+			// @ts-ignore
+			.addChannelOption(option => option
+				.setName('channel')
+				.setDescription('The channel to send bot alerts')
+				.setRequired(true)
+			)
 		)
 	)
 	// @ts-ignore

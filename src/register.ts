@@ -9,12 +9,12 @@
 // All that effort writing the registration script in discord-command-registry
 // just to need to do this anyway because TypeScript. lol.
 import commands from './commands';
-import { CONFIG } from './config';
+import { Env } from './config';
 
 commands.registerCommands({
-	application_id: CONFIG.app,
-	guild: CONFIG.guild,
-	token: CONFIG.token,
+	application_id: Env.app,
+	guild: Env.guild,
+	token: Env.token,
 })
 .then((got: unknown) => console.log('Success!', got))
 .catch((err: Error) => console.error(err));
