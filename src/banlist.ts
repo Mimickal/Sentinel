@@ -6,6 +6,9 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
+import * as https from 'https';
+
+import { parseJSON as parseJsonDate } from 'date-fns';
 import { Guild } from 'discord.js';
 
 import { getUser, getBan } from './database';
@@ -22,6 +25,54 @@ export interface GuildBanItem {
 	ban_id?: number;
 	init_ban_id?: number;
 	banned_date?: Date;
+}
+
+// Hack to get typeof values https://stackoverflow.com/a/69655302
+const dummy = typeof(null as any);
+type TypeOf = typeof dummy;
+
+const ASSERTIONS: Record<keyof GuildBanItem, TypeOf | TypeOf[]> = {
+	guild_id: 'string',
+	user_deleted: 'boolean',
+	user_id: 'string',
+	reason: 'string',
+	ban_id: ['undefined', 'number'],
+	init_ban_id: ['undefined', 'number'],
+	banned_date: ['undefined', 'number', 'string'],
+}
+const NULLABLE: (keyof GuildBanItem)[] = ['user_deleted', 'reason'];
+
+// Validates that the given data actually conforms to the above type assertions.
+//
+// This data comes from the internet, so we need more than TypeScript's static
+// type checker here.
+//
+// Also, it's user-uploaded data, so we need to be extra-sure it's valid.
+function processBanItems(items: GuildBanItem[]): void {
+	if (!Array.isArray(items)) throw new Error('JSON is not an array');
+
+	items.forEach((item, idx) => {
+
+		// Validate values are the proper type
+		(Object.keys(item) as (keyof GuildBanItem)[]).forEach(key => {
+			const value = item[key];
+			const expectedType = ASSERTIONS[key];
+			const prefix = `ban[${idx}].${key}`;
+
+			if (value === null && NULLABLE.includes(key as keyof GuildBanItem))
+				return; // Check next key
+
+			if (Array.isArray(expectedType)) {
+				if (!expectedType.includes(typeof value))
+					throw new Error(`${prefix} must be one of: ${expectedType.join(', ')}`);
+			} else if (expectedType !== typeof value)
+				throw new Error(`${prefix} must be a ${expectedType}`);
+		});
+
+		// Validate values make sense
+		if (item.init_ban_id && item.ban_id === item.init_ban_id)
+			throw new Error(`ban[${idx}] ban_id cannot equal init_ban_id`);
+	});
 }
 
 /**
@@ -60,4 +111,40 @@ export async function buildGuildBanItems(
 	}
 
 	return bans;
+}
+
+/**
+ * Downloads and validates a ban list from a JSON file.
+ */
+export async function downloadGuildBanItems(url: string): Promise<GuildBanItem[]> {
+	const banItems = await httpGet(url);
+	processBanItems(banItems);
+
+	// Dates need to be deserialized from JSON
+	return banItems.map(item => ({
+		...item,
+		banned_date: item.banned_date ? parseJsonDate(item.banned_date) : undefined,
+	}));
+}
+
+/**
+ * Extremely minimal wrapper around https that enables one-line,
+ * Promise-friendly HTTP requests.
+ *
+ * Why this isn't part of the standard library is beyond me.
+ */
+async function httpGet(url: string): Promise<GuildBanItem[]> {
+	return new Promise((resolve, reject) => {
+		https.get(url, response => {
+			const buffers: any[] = [];
+			response.on('data', buffer => buffers.push(buffer));
+			response.on('error', reject);
+			response.on('end', () => {
+				const data = Buffer.concat(buffers).toString();
+				response.statusCode === 200
+					? resolve(JSON.parse(data))
+					: reject(data)
+			});
+		});
+	});
 }

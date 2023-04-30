@@ -18,7 +18,7 @@ export async function recordUserBan({ bannedAt, guildId, reason, refBanId, user 
 	bannedAt?: Date;
 	reason?: string | null;
 	refBanId?: RowId;
-}): Promise<RowId | undefined> {
+}): Promise<RowId> {
 	try {
 		await database.addUser({
 			created_at: user.createdAt,
@@ -51,7 +51,7 @@ export async function banUser({ guild, reason, refBanId, user }: {
 	reason: string;
 	user: User;
 	refBanId?: RowId;
-}): Promise<RowId | undefined> {
+}): Promise<RowId> {
 	await guild.bans.create(user.id, { reason });
 
 	return await recordUserBan({

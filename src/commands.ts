@@ -10,11 +10,15 @@ import {
 	bold,
 	ChannelType,
 	ChatInputCommandInteraction,
+	DiscordAPIError,
 	PermissionFlagsBits,
+	Snowflake,
+	userMention,
 } from 'discord.js';
 // @ts-ignore
 import { SlashCommandRegistry } from 'discord-command-registry';
 
+import { banUser } from './ban';
 import { buildGuildBanItems, downloadGuildBanItems, GuildBanItem } from './banlist';
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import { APP_NAME, GuildConfig, Package } from './config';
@@ -57,6 +61,19 @@ export default new SlashCommandRegistry()
 			.setRequired(false)
 		)
 	)
+	// @ts-ignore
+	.addCommand(command => command
+		.setName('import-bans')
+		.setDescription('Import bans from a file')
+		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+		.setHandler(requireInGuild(importGuildBans))
+		// @ts-ignore
+		.addAttachmentOption(option => option
+			.setName('banlist')
+			.setDescription('A banlist JSON file from the /export-bans command')
+			.setRequired(true)
+		)
+	);
 
 /** Middleware that ensures an interaction is a chat slash command in a Guild. */
 function requireInGuild(func: Handler): Handler {
@@ -96,7 +113,7 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 	}
 
 	try {
-		// Above check guarantees these values are defined
+		// requireInGuild decorator guarantees these values are defined
 		await GuildConfig.setAlertChannel(interaction.guild!.id, channel!.id)
 	} catch (err) {
 		console.error('Failed to set Guild alert channel in database', (err as Error));
@@ -133,4 +150,102 @@ async function exportGuildBans(interaction: ChatInputCommandInteraction): Promis
 			'Failed to build ban list. Do I have permission to read the ban list?'
 		));
 	}
+}
+
+/**
+ * Import Bans from a JSON file and apply them to the Guild.
+ */
+async function importGuildBans(interaction: ChatInputCommandInteraction): Promise<void> {
+	const banList = interaction.options.getAttachment('banlist', true);
+
+	if (!banList.contentType?.includes('application/json')) {
+		await interaction.reply(EphemReply(ErrorMsg('Ban list must be a JSON file!')));
+		return;
+	}
+
+	await interaction.reply(InfoMsg('Loading ban list...'));
+
+	let banItems: GuildBanItem[];
+	try {
+		banItems = await downloadGuildBanItems(banList.url);
+	} catch (err) {
+		console.warn(`Downloaded bad banlist ${banList.url}`, err);
+		await interaction.editReply(ErrorMsg(
+			`Cannot load banlist!\nReason: ${(err as Error).message}`
+		));
+		return;
+	}
+
+	// requireInGuild decorator guarantees this value is defined
+	const guild = interaction.guild!;
+	const reason = `${APP_NAME}: Imported from list`;
+	const userBans: Snowflake[] = [];
+	let errMsg: string | undefined;
+
+	for await (const item of banItems) {
+		try {
+			const user = await interaction.client.users.fetch(item.user_id);
+			// TODO can we get "already banned" here?
+			await banUser({
+				guild, user, reason,
+				refBanId: item.init_ban_id ?? item.ban_id,
+			});
+			userBans.push(user.id);
+
+			// Give progress updates for large ban lists
+			if (userBans.length % 10 === 0) {
+				await interaction.editReply(InfoMsg(
+					`Loading ban list (${userBans.length}/${banItems.length})...`
+				));
+			}
+		} catch (err) {
+			if (err instanceof DiscordAPIError) {
+				console.warn('Failed to ban User in Guild', err);
+				errMsg = `Failed to ban ${userMention(item.user_id)}. ` +
+					'Do I have the right permissions?';
+			} else {
+				console.error('Failed to add ban to database', err);
+				errMsg = 'Something went wrong on my end.';
+			}
+
+			break;
+		}
+	}
+
+	const messages = splitLongMessage([
+		errMsg ? `${errMsg}\n\n` : '',
+		'Successfully banned',
+		banItems.length === userBans.length
+			? `all ${banItems.length}`
+			: `${userBans.length}/${banItems.length}`,
+		'users:\n',
+		userBans.map(banId => userMention(banId)).join(' '),
+	].join(' '));
+
+	const Decorate = errMsg ? ErrorMsg : GoodMsg;
+	const firstMessage = messages.shift()!;
+	await interaction.editReply(Decorate(firstMessage));
+	for await (const message of messages) {
+		await interaction.reply(Decorate(message));
+	}
+}
+
+// There are surely more efficient ways to do this,
+// but this won't be called very often so whatever.
+function splitLongMessage(content: string): string[] {
+	const MAX_MESSAGE_LEN = 2000;
+	const parts: string[] = [];
+
+	let curMsg = '';
+	content.split(' ').forEach(word => {
+		if (curMsg.length + word.length < MAX_MESSAGE_LEN) {
+			curMsg += ` ${word}`;
+		} else {
+			parts.push(curMsg);
+			curMsg = word;
+		}
+	});
+	parts.push(curMsg);
+
+	return parts;
 }
