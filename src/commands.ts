@@ -19,7 +19,12 @@ import {
 import { SlashCommandRegistry } from 'discord-command-registry';
 
 import { banUser } from './ban';
-import { buildGuildBanItems, downloadGuildBanItems, GuildBanItem } from './banlist';
+import {
+	banFileName,
+	buildGuildBanItems,
+	downloadGuildBanItems,
+	GuildBanItem,
+ } from './banlist';
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import { APP_NAME, GuildConfig, Package } from './config';
 
@@ -146,7 +151,7 @@ async function exportGuildBans(interaction: ChatInputCommandInteraction): Promis
 
 		await interaction.editReply(FileReply({
 			content: GoodMsg('Ban list successfully exported'),
-			name: `banlist-${guild.id}.json`,
+			name: banFileName(guild),
 			data: banData,
 		}));
 	} catch (err) {

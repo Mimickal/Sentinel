@@ -11,6 +11,7 @@ import * as https from 'https';
 import { parseJSON as parseJsonDate } from 'date-fns';
 import { Guild } from 'discord.js';
 
+import { APP_NAME } from './config';
 import { getUser, getBan } from './database';
 
 // NOTE this type is used to generate files people will download.
@@ -125,6 +126,13 @@ export async function downloadGuildBanItems(url: string): Promise<GuildBanItem[]
 		...item,
 		banned_date: item.banned_date ? parseJsonDate(item.banned_date) : undefined,
 	}));
+}
+
+/**
+ * Generates a standard ban list filename from a Guild's ID.
+ */
+export function banFileName(guild: Guild): string {
+	return `${APP_NAME}-${guild.id}_${new Date().toISOString().split('T')[0]}.json`;
 }
 
 /**
