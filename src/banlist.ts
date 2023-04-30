@@ -9,10 +9,11 @@
 import * as https from 'https';
 
 import { parseJSON as parseJsonDate } from 'date-fns';
-import { Guild } from 'discord.js';
+import { Guild, GuildBan } from 'discord.js';
 
 import { APP_NAME } from './config';
 import { getUser, getBan } from './database';
+import { fetchAll } from './util';
 
 // NOTE this type is used to generate files people will download.
 // Be very careful changing values here. We can't control those files once
@@ -88,10 +89,7 @@ export async function buildGuildBanItems(
 ): Promise<GuildBanItem[]> {
 	const bans: GuildBanItem[] = [];
 
-	// TODO need to batch for giant lists
-	const curBans = await guild.bans.fetch();
-
-	for await (const ban of curBans.values()) {
+	for await (const ban of fetchAll<GuildBan>(guild.bans)) {
 		if (pattern && !ban.reason?.match(pattern)) continue;
 
 		const botBan = await getBan({
