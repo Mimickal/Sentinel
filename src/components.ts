@@ -74,6 +74,10 @@ export const InfoMsg = (content: string): BaseMessageOptions => ({
 	content: `:information_source: ${content}`,
 });
 
+export const WarnMsg = (content: string): BaseMessageOptions => ({
+	content: `:warning: ${content}`,
+});
+
 export const GoodMsg = (content: string): BaseMessageOptions => ({
 	content: `:white_check_mark: ${content}`,
 });

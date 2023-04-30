@@ -16,7 +16,7 @@ const client = new Discord.Client({
 	intents: [
 		Discord.GatewayIntentBits.Guilds,
 		Discord.GatewayIntentBits.GuildMembers,
-		Discord.GatewayIntentBits.GuildMessages,
+		Discord.GatewayIntentBits.GuildModeration,
 	],
 	partials: [
 		Discord.Partials.Channel,
@@ -32,8 +32,8 @@ const client = new Discord.Client({
 });
 
 client.on(Discord.Events.ClientReady, events.onReady);
-client.on(Discord.Events.GuildBanAdd, events.onMemberBanned);
-client.on(Discord.Events.GuildBanRemove, events.onMemberUnbanned);
+client.on(Discord.Events.GuildBanAdd, events.onUserBanned);
+client.on(Discord.Events.GuildBanRemove, events.onUserUnbanned);
 client.on(Discord.Events.GuildCreate, events.onGuildJoin);
 client.on(Discord.Events.GuildDelete, events.onGuildLeave);
 client.on(Discord.Events.InteractionCreate, events.onInteraction);

@@ -10,12 +10,14 @@ import {
 	BaseInteraction,
 	ButtonInteraction,
 	Client,
+	DiscordAPIError,
 	Guild,
 	GuildBan,
 	Message,
 	userMention,
 } from 'discord.js';
 
+import { banUser, recordUserBan } from './ban';
 import commands from './commands';
 import {
 	BanEmbed,
@@ -23,10 +25,11 @@ import {
 	ErrorMsg,
 	GoodMsg,
 	InfoMsg,
+	WarnMsg,
 } from './components';
 import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
-import { GuildRow } from './database';
+import { GuildRow, RowId } from './database';
 
 
 /**
@@ -98,15 +101,18 @@ export async function onInteraction(interaction: BaseInteraction) {
 	}
 }
 
-/** Event handler for a Guild Member being banned. */
-export async function onMemberBanned(ban: GuildBan) {
+/** Event handler for a User being banned. */
+export async function onUserBanned(ban: GuildBan) {
+	console.info('Guild banned User');
+	await ban.fetch(); // Sometimes need to fetch to get reason
+
 	// Ban doesn't have a timestamp, so we use our own. Close enough.
 	const bannedAt = new Date(Date.now());
-	const banId = await addBannedUser({
-		bannedAt,
+	const banId = await recordUserBan({
+		bannedAt: bannedAt,
 		guildId: ban.guild.id,
-		userId: ban.user.id,
 		reason: ban.reason,
+		user: ban.user,
 	});
 
 	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
@@ -115,47 +121,18 @@ export async function onMemberBanned(ban: GuildBan) {
 	const guildRows = await database.getGuilds();
 	for await (const guildRow of guildRows) {
 		try {
-			await sendBanAlert({
-				ban, bannedAt, banId, guildRow,
-			});
+			await sendBanAlert({ ban, bannedAt, banId, guildRow });
 		} catch (err) {
 			console.warn('Failed to send ban alert to Guild', err);
 		}
 	}
 }
 
-async function addBannedUser({ bannedAt, guildId, userId, reason, refId }: {
-	bannedAt: Date;
-	guildId: string;
-	userId: string;
-	reason?: string | null;
-	refId?: number;
-}): Promise<number | undefined> {
-	try {
-		await database.addUser({
-			id: userId,
-			created_at: bannedAt,
-		});
-
-		const banId = await database.addBan({
-			banned_at: bannedAt,
-			guild_id: guildId,
-			reason: reason,
-			user_id: userId,
-			ref_ban_id: refId,
-		});
-
-		return banId;
-	} catch (err) {
-		console.error('Failed to add ban to database', err);
-	}
-}
-
 async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	ban: GuildBan;
 	bannedAt: Date;
-	banId: number | undefined;
 	guildRow: GuildRow;
+	banId?: RowId;
 }): Promise<void> {
 	// Don't send alert to the guild the ban came from.
 	if (guildRow.id === ban.guild.id) return;
@@ -194,8 +171,10 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	});
 }
 
-/** Event handler for a Guild Member being unbanned. */
-export async function onMemberUnbanned(ban: GuildBan) {
+/** Event handler for a User being unbanned. */
+export async function onUserUnbanned(ban: GuildBan) {
+	console.info('Guild unbanned User');
+
 	try {
 		await database.removeBan({
 			guild_id: ban.guild.id,
@@ -231,19 +210,23 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 	const reason = `${APP_NAME}: Confirmed by admin`;
 
 	try {
-		await guild.bans.create(userId, { reason });
+		// The ban event will also try to store the ban, but we won't have
+		// access to the reference banId there, so just do the ban here.
+		const user = await interaction.client.users.fetch(userId);
+		await banUser({ guild, reason, user, refBanId: banId });
 	} catch (err) {
-		return interaction.reply(ErrorMsg('Cannot ban user. Do I have the right permissions?'));
+		if (err instanceof DiscordAPIError) {
+			return interaction.reply(ErrorMsg(
+				'Cannot ban user. Do I have the right permissions?'
+			));
+		} else {
+			return interaction.reply(WarnMsg(
+				'User was successfully banned in your server, but I failed ' +
+				'to record it in my database. If you want to record this ' +
+				'ban, click the ban button again.'
+			));
+		}
 	}
-
-	// The ban event will also call this, but we need to set refId here.
-	await addBannedUser({
-		bannedAt: new Date(Date.now()),
-		guildId: guild.id,
-		reason: reason,
-		refId: banId,
-		userId: userId,
-	});
 
 	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
 }
