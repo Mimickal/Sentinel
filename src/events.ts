@@ -36,7 +36,7 @@ import { GuildRow, RowId } from './database';
  * Event handler for when the bot is logged in.
  * Logs the bot user we logged in as.
  */
-export async function onReady(client: Client) {
+export async function onReady(client: Client): Promise<void> {
 	console.info(`Logged in as ${client.user?.tag} (${client.user?.id})`);
 }
 
@@ -44,7 +44,7 @@ export async function onReady(client: Client) {
  * Event handler for joining a Guild.
  * Creates a record for the Guild in the database.
  */
-export async function onGuildJoin(guild: Guild) {
+export async function onGuildJoin(guild: Guild): Promise<void> {
 	console.log('Joined Guild');
 
 	const alertChannel = guild.systemChannel;
@@ -69,7 +69,7 @@ export async function onGuildJoin(guild: Guild) {
  * Event handler for leaving a Guild.
  * Updates the database row for this Guild with the time of leaving.
  */
-export async function onGuildLeave(guild: Guild) {
+export async function onGuildLeave(guild: Guild): Promise<void> {
 	console.log('Left Guild');
 	try {
 		await database.setGuildLeft({
@@ -85,7 +85,7 @@ export async function onGuildLeave(guild: Guild) {
  * Event handler for receiving some kind of interaction.
  * Logs the interaction and passes it on to the command handler.
  */
-export async function onInteraction(interaction: BaseInteraction) {
+export async function onInteraction(interaction: BaseInteraction): Promise<void> {
 	//console.info(`Received ${detail(interaction)}`);
 	console.info('Received interaction');
 
@@ -102,7 +102,7 @@ export async function onInteraction(interaction: BaseInteraction) {
 }
 
 /** Event handler for a User being banned. */
-export async function onUserBanned(ban: GuildBan) {
+export async function onUserBanned(ban: GuildBan): Promise<void> {
 	console.info('Guild banned User');
 	await ban.fetch(); // Sometimes need to fetch to get reason
 
@@ -172,7 +172,7 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 }
 
 /** Event handler for a User being unbanned. */
-export async function onUserUnbanned(ban: GuildBan) {
+export async function onUserUnbanned(ban: GuildBan): Promise<void> {
 	console.info('Guild unbanned User');
 
 	try {
@@ -187,7 +187,7 @@ export async function onUserUnbanned(ban: GuildBan) {
 }
 
 /** Handler for a button press. */
-async function handleButtonInteraction(interaction: ButtonInteraction) {
+async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
 	if (!BanButton.isButtonId(interaction.customId)) {
 		console.warn('Unrecognized button interaction:', interaction.customId);
 		return;
@@ -203,7 +203,8 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 		user_id: userId,
 	});
 	if (existingBan) {
-		return interaction.reply(InfoMsg('User already banned'));
+		await interaction.reply(InfoMsg('User already banned'));
+		return;
 	}
 
 	console.log('Button banning User in Guild');
@@ -216,23 +217,24 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 		await banUser({ guild, reason, user, refBanId: banId });
 	} catch (err) {
 		if (err instanceof DiscordAPIError) {
-			return interaction.reply(ErrorMsg(
+			await interaction.reply(ErrorMsg(
 				'Cannot ban user. Do I have the right permissions?'
 			));
 		} else {
-			return interaction.reply(WarnMsg(
+			await interaction.reply(WarnMsg(
 				'User was successfully banned in your server, but I failed ' +
 				'to record it in my database. If you want to record this ' +
 				'ban, click the ban button again.'
 			));
 		}
+		return;
 	}
 
 	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
 }
 
 /** This is for testing, because sending a message is much easier than banning. */
-export async function testMessage(message: Message) {
+export async function testMessage(message: Message): Promise<void> {
 	if (
 		message.channel.id !== '186930896606199808' ||
 		message.author.id !== '139881327469002752'
