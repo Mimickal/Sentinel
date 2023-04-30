@@ -15,6 +15,7 @@ import {
 // @ts-ignore
 import { SlashCommandRegistry } from 'discord-command-registry';
 
+import { buildGuildBanItems, downloadGuildBanItems, GuildBanItem } from './banlist';
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import { APP_NAME, GuildConfig, Package } from './config';
 
@@ -119,7 +120,7 @@ async function exportGuildBans(interaction: ChatInputCommandInteraction): Promis
 	await interaction.reply(InfoMsg('Building ban list...'));
 
 	try {
-		const banData = await getGuildBanData(guild, filter);
+		const banData = await buildGuildBanItems(guild, filter);
 
 		await interaction.editReply(FileReply({
 			content: GoodMsg('Ban list successfully exported'),

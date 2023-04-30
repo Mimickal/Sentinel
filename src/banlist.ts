@@ -7,9 +7,14 @@
  * for more information.
  ******************************************************************************/
 import { Guild } from 'discord.js';
-import { getUser, getUserBan } from './database';
 
-interface GuildBanData {
+import { getUser, getBan } from './database';
+
+// NOTE this type is used to generate files people will download.
+// Be very careful changing values here. We can't control those files once
+// they're out in the wild. Try to keep them as compatible as possible.
+
+export interface GuildBanItem {
 	guild_id: string;
 	user_deleted: boolean | null;
 	user_id: string;
@@ -19,10 +24,17 @@ interface GuildBanData {
 	banned_date?: Date;
 }
 
-export async function getGuildBanData(
+/**
+ * Builds a ban list from the given Guild's ban information.
+ *
+ * This list is cross-checked with our own database to add additional info
+ * where possible, such as ban date (which isn't included from Discord, for
+ * some crazy reason).
+ */
+export async function buildGuildBanItems(
 	guild: Guild, pattern?: string
-): Promise<GuildBanData[]> {
-	const bans: GuildBanData[] = [];
+): Promise<GuildBanItem[]> {
+	const bans: GuildBanItem[] = [];
 
 	// TODO need to batch for giant lists
 	const curBans = await guild.bans.fetch();
@@ -30,7 +42,7 @@ export async function getGuildBanData(
 	for await (const ban of curBans.values()) {
 		if (pattern && !ban.reason?.match(pattern)) continue;
 
-		const botBan = await getUserBan({
+		const botBan = await getBan({
 			guild_id: guild.id,
 			user_id: ban.user.id,
 		});
