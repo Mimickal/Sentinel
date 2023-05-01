@@ -41,6 +41,8 @@ if (extraKeys.length > 0)
 	console.warn('Extra config keys given:', extraKeys);
 
 export const APP_NAME = 'Sentinel';
+export const UNKNOWN_ERR = "Odd. That wasn't supposed to happen.";
+
 // Can do this goofy typecast because we validate all these keys exist above.
 export const Env: Config = Array.from(ALL_KEYS).reduce(
 	(obj: Partial<Config>, key) => {

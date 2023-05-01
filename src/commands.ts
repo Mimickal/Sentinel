@@ -26,7 +26,7 @@ import {
 	GuildBanItem,
  } from './banlist';
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
-import { APP_NAME, GuildConfig, Package } from './config';
+import { APP_NAME, GuildConfig, Package, UNKNOWN_ERR } from './config';
 
 type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
 
@@ -215,7 +215,7 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 					'Do I have the right permissions?';
 			} else {
 				console.error('Failed to add ban to database', err);
-				errMsg = 'Something went wrong on my end.';
+				errMsg = UNKNOWN_ERR;
 			}
 
 			break;
