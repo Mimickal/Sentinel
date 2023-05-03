@@ -17,6 +17,7 @@ import {
 } from 'discord.js';
 // @ts-ignore
 import { SlashCommandRegistry } from 'discord-command-registry';
+import { detail, GlobalLogger } from '@mimickal/discord-logging';
 
 import { banUser } from './ban';
 import {
@@ -27,6 +28,8 @@ import {
  } from './banlist';
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
 import { APP_NAME, GuildConfig, Package, UNKNOWN_ERR } from './config';
+
+const logger = GlobalLogger.logger;
 
 type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
 
@@ -122,11 +125,12 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 		return;
 	}
 
+	// requireInGuild decorator guarantees guild and channel are defined
+	const guild = interaction.guild!;
 	try {
-		// requireInGuild decorator guarantees these values are defined
-		await GuildConfig.setAlertChannel(interaction.guild!.id, channel!.id)
+		await GuildConfig.setAlertChannel(guild.id, channel!.id)
 	} catch (err) {
-		console.error('Failed to set Guild alert channel in database', (err as Error));
+		logger.error(`Failed to set ${detail(guild)} alert channel in database`, err);
 		await interaction.reply(EphemReply(ErrorMsg(
 			`Failed to set alert channel. Try again?`,
 		)));
@@ -143,7 +147,7 @@ async function exportGuildBans(interaction: ChatInputCommandInteraction): Promis
 	const filter = interaction.options.getString('pattern') ?? undefined;
 	const guild = interaction.guild!; // Above check guarantees this value.
 
-	console.log('Building ban list for Guild');
+	logger.info(`Building ban list for ${detail(guild)}`);
 	await interaction.reply(InfoMsg('Building ban list...'));
 
 	try {
@@ -155,7 +159,7 @@ async function exportGuildBans(interaction: ChatInputCommandInteraction): Promis
 			data: banData,
 		}));
 	} catch (err) {
-		console.error('Failed to build ban list', err);
+		logger.warn(`Failed to build ban list in ${detail(guild)}`, err);
 		await interaction.editReply(ErrorMsg(
 			'Failed to build ban list. Do I have permission to read the ban list?'
 		));
@@ -179,7 +183,7 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 	try {
 		banItems = await downloadGuildBanItems(banList.url);
 	} catch (err) {
-		console.warn(`Downloaded bad banlist ${banList.url}`, err);
+		logger.warn(`Downloaded bad banlist ${banList.url}`, err);
 		await interaction.editReply(ErrorMsg(
 			`Cannot load banlist!\nReason: ${(err as Error).message}`
 		));
@@ -210,11 +214,11 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 			}
 		} catch (err) {
 			if (err instanceof DiscordAPIError) {
-				console.warn('Failed to ban User in Guild', err);
+				logger.warn(`Failed to ban User ${item.user_id} in ${detail(guild)}`, err);
 				errMsg = `Failed to ban ${userMention(item.user_id)}. ` +
 					'Do I have the right permissions?';
 			} else {
-				console.error('Failed to add ban to database', err);
+				logger.error('Failed to add ban to database', err);
 				errMsg = UNKNOWN_ERR;
 			}
 

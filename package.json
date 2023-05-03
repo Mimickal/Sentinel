@@ -25,6 +25,7 @@
   "author": "Mimickal <mimickal.dev@gmail.com>",
   "license": "AGPL-3.0",
   "dependencies": {
+    "@mimickal/discord-logging": "github:Mimickal/discord-logging#v1.2.0",
     "@types/js-yaml": "^4.0.5",
     "date-fns": "^2.29.3",
     "discord-command-registry": "^2.1.0",

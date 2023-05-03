@@ -7,8 +7,14 @@
  * for more information.
  ******************************************************************************/
 import * as Discord from 'discord.js';
+import { createLogger, GlobalLogger } from '@mimickal/discord-logging';
 
 import * as config from './config';
+
+// Need to set logger before loading modules that use it.
+const logger = createLogger({ filename: config.Env.logfile });
+GlobalLogger.setGlobalLogger(logger);
+
 import * as events from './events';
 
 // Everything operates on IDs, so we can safely rely on partials.
@@ -39,12 +45,12 @@ client.on(Discord.Events.GuildDelete, events.onGuildLeave);
 client.on(Discord.Events.InteractionCreate, events.onInteraction);
 client.on(Discord.Events.MessageCreate, events.testMessage);
 
-console.info(`Bot is starting with config: ${JSON.stringify({
+logger.info(`Bot is starting with config: ${JSON.stringify({
 	...config.Env,
 	token: '<REDACTED>',
 })}`);
 
 client.login(config.Env.token).catch(err => {
-	console.error('Failed to log in!', err);
+	logger.error('Failed to log in!', err);
 	process.exit(1);
 });

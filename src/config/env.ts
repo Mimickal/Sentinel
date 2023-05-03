@@ -11,12 +11,13 @@ import { resolve } from 'path';
 interface Config {
 	app: string;
 	token: string;
-	guild?: string;
 	database?: string;
+	guild?: string;
+	logfile?: string;
 }
 
 const REQUIRED_KEYS: (keyof Config)[] = ['app', 'token'];
-const OPTIONAL_KEYS: (keyof Config)[] = ['guild', 'database'];
+const OPTIONAL_KEYS: (keyof Config)[] = ['database', 'guild', 'logfile'];
 const ALL_KEYS = new Set([...REQUIRED_KEYS, ...OPTIONAL_KEYS]);
 
 const configFile = process.argv[2];

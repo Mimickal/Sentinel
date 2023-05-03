@@ -16,6 +16,7 @@ import {
 	Message,
 	userMention,
 } from 'discord.js';
+import { detail, GlobalLogger } from '@mimickal/discord-logging';
 
 import { banUser, recordUserBan } from './ban';
 import commands from './commands';
@@ -31,13 +32,14 @@ import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { GuildRow, RowId } from './database';
 
+const logger = GlobalLogger.logger;
 
 /**
  * Event handler for when the bot is logged in.
  * Logs the bot user we logged in as.
  */
 export async function onReady(client: Client): Promise<void> {
-	console.info(`Logged in as ${client.user?.tag} (${client.user?.id})`);
+	logger.info(`Logged in as ${client.user?.tag} (${client.user?.id})`);
 }
 
 /**
@@ -45,11 +47,11 @@ export async function onReady(client: Client): Promise<void> {
  * Creates a record for the Guild in the database.
  */
 export async function onGuildJoin(guild: Guild): Promise<void> {
-	console.log('Joined Guild');
+	logger.info(`Joined ${detail(guild)}`);
 
 	const alertChannel = guild.systemChannel;
 	if (!alertChannel) {
-		console.warn('Guild has no alert channel and will not receive alerts.');
+		logger.warn('Guild has no alert channel and will not receive alerts.');
 	}
 
 	try {
@@ -61,7 +63,7 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
 		});
 		await GuildConfig.setAlertChannel(guild.id, alertChannel?.id);
 	} catch (err) {
-		console.error('Failed to add Guild to database', err);
+		logger.error(`Failed to add ${detail(guild)} to database`, err);
 	}
 }
 
@@ -70,14 +72,14 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
  * Updates the database row for this Guild with the time of leaving.
  */
 export async function onGuildLeave(guild: Guild): Promise<void> {
-	console.log('Left Guild');
+	logger.info(`Left ${detail(guild)}`);
 	try {
 		await database.setGuildLeft({
 			id: guild.id,
 			left_at: new Date(Date.now()),
 		});
 	} catch (err) {
-		console.error('Failed to remove Guild from database', err);
+		logger.error(`Failed to remove ${detail(guild)} from database`, err);
 	}
 }
 
@@ -86,8 +88,7 @@ export async function onGuildLeave(guild: Guild): Promise<void> {
  * Logs the interaction and passes it on to the command handler.
  */
 export async function onInteraction(interaction: BaseInteraction): Promise<void> {
-	//console.info(`Received ${detail(interaction)}`);
-	console.info('Received interaction');
+	logger.info(`Received ${detail(interaction)}`);
 
 	try {
 		if (interaction.isButton()) {
@@ -96,14 +97,13 @@ export async function onInteraction(interaction: BaseInteraction): Promise<void>
 			await commands.execute(interaction);
 		}
 	} catch (err) {
-		//logger.error(`${detail(interaction)} error fell through:`, err);
-		console.info('Interaction error fell through:', err);
+		logger.info(`${detail(interaction)} error fell through:`, err);
 	}
 }
 
 /** Event handler for a User being banned. */
 export async function onUserBanned(ban: GuildBan): Promise<void> {
-	console.info('Guild banned User');
+	logger.info(`${detail(ban.guild)} banned ${detail(ban.user)}`);
 	await ban.fetch(); // Sometimes need to fetch to get reason
 
 	// Ban doesn't have a timestamp, so we use our own. Close enough.
@@ -123,7 +123,8 @@ export async function onUserBanned(ban: GuildBan): Promise<void> {
 		try {
 			await sendBanAlert({ ban, bannedAt, banId, guildRow });
 		} catch (err) {
-			console.warn('Failed to send ban alert to Guild', err);
+			// Can't use detail because we only have the Guild ID here.
+			logger.warn(`Failed to send ban alert to Guild ${guildRow.id}`, err);
 		}
 	}
 }
@@ -173,7 +174,7 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 
 /** Event handler for a User being unbanned. */
 export async function onUserUnbanned(ban: GuildBan): Promise<void> {
-	console.info('Guild unbanned User');
+	logger.info(`${detail(ban.guild)} unbanned ${detail(ban.user)}`);
 
 	try {
 		await database.removeBan({
@@ -181,7 +182,7 @@ export async function onUserUnbanned(ban: GuildBan): Promise<void> {
 			user_id: ban.user.id,
 		});
 	} catch (err) {
-		console.error('Failed to remove ban from database', err);
+		logger.error(`Failed to remove ${detail(ban)} from database`, err);
 	}
 	// TODO do we want to alert other servers?
 }
@@ -189,7 +190,7 @@ export async function onUserUnbanned(ban: GuildBan): Promise<void> {
 /** Handler for a button press. */
 async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
 	if (!BanButton.isButtonId(interaction.customId)) {
-		console.warn('Unrecognized button interaction:', interaction.customId);
+		logger.warn(`Unrecognized button interaction: ${interaction.customId}`);
 		return;
 	}
 
@@ -207,7 +208,7 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 		return;
 	}
 
-	console.log('Button banning User in Guild');
+	logger.info(`Button banning User ${userId} in ${detail(guild)}`);
 	const reason = `${APP_NAME}: Confirmed by admin`;
 
 	try {

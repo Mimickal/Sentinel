@@ -7,9 +7,12 @@
  * for more information.
  ******************************************************************************/
 import { DiscordAPIError, Guild, Snowflake, User } from 'discord.js';
+import { GlobalLogger } from '@mimickal/discord-logging';
 
 import * as database from './database';
 import { RowId } from './database';
+
+const logger = GlobalLogger.logger;
 
 /** Adds a Ban and an associated User to the database, logging any errors. */
 export async function recordUserBan({ bannedAt, guildId, reason, refBanId, user }: {
@@ -33,7 +36,7 @@ export async function recordUserBan({ bannedAt, guildId, reason, refBanId, user 
 			user_id: user.id,
 		});
 	} catch (err) {
-		console.error('Failed to add ban to database', err);
+		logger.error('Failed to add ban to database', err);
 		throw err;
 	}
 }
