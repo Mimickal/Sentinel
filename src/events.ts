@@ -13,7 +13,6 @@ import {
 	DiscordAPIError,
 	Guild,
 	GuildBan,
-	Message,
 	userMention,
 } from 'discord.js';
 import { detail, GlobalLogger } from '@mimickal/discord-logging';
@@ -233,17 +232,3 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 
 	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
 }
-
-/** This is for testing, because sending a message is much easier than banning. */
-export async function testMessage(message: Message): Promise<void> {
-	if (
-		message.channel.id !== '186930896606199808' ||
-		message.author.id !== '139881327469002752'
-	) return;
-	console.log('Running test event');
-
-
-}
-
-// Going to save each thing we test down here, so we can integrate them later.
-
