@@ -30,6 +30,7 @@ import {
 import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { GuildRow, RowId } from './database';
+import { fetchAll } from './util';
 
 const logger = GlobalLogger.logger;
 
@@ -43,7 +44,7 @@ export async function onReady(client: Client): Promise<void> {
 
 /**
  * Event handler for joining a Guild.
- * Creates a record for the Guild in the database.
+ * Creates a record for the Guild and all of its existing bans in the database.
  */
 export async function onGuildJoin(guild: Guild): Promise<void> {
 	logger.info(`Joined ${detail(guild)}`);
@@ -63,6 +64,19 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
 		await GuildConfig.setAlertChannel(guild.id, alertChannel?.id);
 	} catch (err) {
 		logger.error(`Failed to add ${detail(guild)} to database`, err);
+	}
+
+	for await (const ban of fetchAll<GuildBan>(guild.bans)) {
+		try {
+			await recordUserBan({
+				guildId: ban.guild.id,
+				user: ban.user,
+				reason: ban.reason,
+				// bannedAt intentionally left undefined because we don't know ban time.
+			});
+		} catch (err) {
+			logger.error(`Failed to add ${detail(ban)} to database`, err);
+		}
 	}
 }
 

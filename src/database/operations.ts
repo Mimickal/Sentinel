@@ -79,6 +79,12 @@ export async function getBan(ban: FetchBanRow): Promise<BanRow|undefined> {
 	return parseDates(row, ['banned_at']);
 }
 
+export async function getGuildBans(guildId: Snowflake): Promise<BanRow[]> {
+	return await knex<BanRow>(Tables.BANS)
+		.select()
+		.where('guild_id', '=', guildId);
+}
+
 export async function removeBan(ban: FetchBanRow): Promise<void> {
 	await knex<FetchBanRow>(Tables.BANS)
 		.delete()

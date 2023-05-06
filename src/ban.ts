@@ -29,7 +29,7 @@ export async function recordUserBan({ bannedAt, guildId, reason, refBanId, user 
 		});
 
 		return await database.addBan({
-			banned_at: bannedAt ?? new Date(Date.now()),
+			banned_at: bannedAt,
 			guild_id: guildId,
 			reason: reason,
 			ref_ban_id: refBanId,

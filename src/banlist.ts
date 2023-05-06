@@ -9,11 +9,10 @@
 import * as https from 'https';
 
 import { parseJSON as parseJsonDate } from 'date-fns';
-import { Guild, GuildBan } from 'discord.js';
+import { Guild } from 'discord.js';
 
 import { APP_NAME } from './config';
-import { getUser, getBan } from './database';
-import { fetchAll } from './util';
+import { getGuildBans } from './database';
 
 // NOTE this type is used to generate files people will download.
 // Be very careful changing values here. We can't control those files once
@@ -21,7 +20,7 @@ import { fetchAll } from './util';
 
 export interface GuildBanItem {
 	guild_id: string;
-	user_deleted: boolean | null;
+	user_deleted?: boolean | null;
 	user_id: string;
 	reason: string | null;
 	ban_id?: number;
@@ -50,7 +49,7 @@ const NULLABLE: (keyof GuildBanItem)[] = ['user_deleted', 'reason'];
 // type checker here.
 //
 // Also, it's user-uploaded data, so we need to be extra-sure it's valid.
-function processBanItems(items: GuildBanItem[]): void {
+function validateBanItems(items: GuildBanItem[]): void {
 	if (!Array.isArray(items)) throw new Error('JSON is not an array');
 
 	items.forEach((item, idx) => {
@@ -87,29 +86,16 @@ function processBanItems(items: GuildBanItem[]): void {
 export async function buildGuildBanItems(
 	guild: Guild, pattern?: string
 ): Promise<GuildBanItem[]> {
-	const bans: GuildBanItem[] = [];
-
-	for await (const ban of fetchAll<GuildBan>(guild.bans)) {
-		if (pattern && !ban.reason?.match(pattern)) continue;
-
-		const botBan = await getBan({
-			guild_id: guild.id,
-			user_id: ban.user.id,
-		});
-		const userRow = await getUser(ban.user.id);
-
-		bans.push({
-			guild_id: guild.id,
-			user_deleted: userRow?.deleted ?? null,
-			user_id: ban.user.id,
-			ban_id: botBan?.id,
-			banned_date: botBan?.banned_at,
-			init_ban_id: botBan?.ref_ban_id,
+	return (await getGuildBans(guild.id))
+		.filter(ban => pattern ? ban.reason?.match(pattern) : true)
+		.map(ban => ({
+			ban_id: ban.id,
+			banned_date: ban.banned_at,
+			guild_id: ban.guild_id,
+			init_ban_id: ban.ref_ban_id,
 			reason: ban.reason || null,
-		});
-	}
-
-	return bans;
+			user_id: ban.user_id,
+		}));
 }
 
 /**
@@ -117,7 +103,7 @@ export async function buildGuildBanItems(
  */
 export async function downloadGuildBanItems(url: string): Promise<GuildBanItem[]> {
 	const banItems = await httpGet(url);
-	processBanItems(banItems);
+	validateBanItems(banItems);
 
 	// Dates need to be deserialized from JSON
 	return banItems.map(item => ({
