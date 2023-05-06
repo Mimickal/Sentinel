@@ -62,6 +62,7 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
 			name: guild.name,
 		});
 		await GuildConfig.setAlertChannel(guild.id, alertChannel?.id);
+		await GuildConfig.setBroadcast(guild.id, true);
 	} catch (err) {
 		logger.error(`Failed to add ${detail(guild)} to database`, err);
 	}
@@ -130,6 +131,10 @@ export async function onUserBanned(ban: GuildBan): Promise<void> {
 
 	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
 	if (ban.reason?.startsWith(APP_NAME)) return;
+
+	// Don't broadcast bans if the originating guild has it disabled
+	const guildConfig = await GuildConfig.for(ban.guild.id);
+	if (!guildConfig.broadcast) return;
 
 	const guildRows = await database.getGuilds();
 	for await (const guildRow of guildRows) {

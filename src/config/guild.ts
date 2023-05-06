@@ -10,7 +10,7 @@ import { Snowflake } from 'discord.js';
 
 import * as database from '../database';
 
-export type GuildConfigKey = 'alertChannelId';
+export type GuildConfigKey = 'alertChannelId' | 'broadcast';
 type ConfRecord = Map<GuildConfigKey, string | null>;
 
 /** Bot configuration for an individual Guild. */
@@ -24,11 +24,13 @@ export default class GuildConfig {
 	}
 
 	#_alertChannelId: Snowflake | null;
+	#_broadcast: boolean;
 	#_guildId: Snowflake;
 
 	private constructor(guildId: Snowflake, config: ConfRecord) {
 		this.#_guildId = guildId;
-		this.#_alertChannelId = config.get('alertChannelId') ?? null;
+		this.#_alertChannelId = config.get('alertChannelId') as string ?? null;
+		this.#_broadcast = config.get('broadcast') === 'true';
 	}
 
 	// NOTE: guildId is transient and read-only, so no "set guildId(...)"
@@ -44,6 +46,10 @@ export default class GuildConfig {
 		return this.#_alertChannelId;
 	}
 
+	get broadcast(): boolean | null {
+		return this.#_broadcast;
+	}
+
 	// END DANGER ZONE
 
 	static async setAlertChannel(
@@ -57,9 +63,25 @@ export default class GuildConfig {
 		});
 	}
 
-	async setAlertChannel(channel: Snowflake | null | undefined) {
+	async setAlertChannel(channel: Snowflake | null | undefined): Promise<void> {
 		const channelId = channel ?? null;
 		this.#_alertChannelId = channelId;
 		return GuildConfig.setAlertChannel(this.guildId, channelId);
+	}
+
+	static async setBroadcast(
+		guildId: Snowflake,
+		broadcast: boolean,
+	): Promise<void> {
+		return database.setGuildConfigValue({
+			guild_id: guildId,
+			key: 'broadcast',
+			value: broadcast.toString(),
+		});
+	}
+
+	async setBroadcast(broadcast: boolean): Promise<void> {
+		this.#_broadcast = broadcast;
+		return GuildConfig.setBroadcast(this.guildId, broadcast);
 	}
 }

@@ -60,6 +60,18 @@ export default new SlashCommandRegistry()
 				.setRequired(true)
 			)
 		)
+		// @ts-ignore
+		.addSubcommand(subcommand => subcommand
+			.setName('broadcast')
+			.setDescription("Enable or disable broadcasting this server's bans to other servers")
+			.setHandler(requireInGuild(setBroadcast))
+			// @ts-ignore
+			.addBooleanOption(option => option
+				.setName('enabled')
+				.setDescription("Broadcast this server's bans?")
+				.setRequired(true)
+			)
+		)
 	)
 	// @ts-ignore
 	.addCommand(command => command
@@ -138,6 +150,29 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 	}
 
 	await interaction.reply(GoodMsg(`Now sending alerts to ${channel}`));
+}
+
+/**
+ * Configures whether or not to broadcast a Guild's bans to other Guilds.
+ */
+async function setBroadcast(interaction: ChatInputCommandInteraction): Promise<void> {
+	const enabled = interaction.options.getBoolean('enabled', true);
+
+	// requireInGuild decorator guarantees guild is defined
+	const guild = interaction.guild!;
+	try {
+		await GuildConfig.setBroadcast(guild.id, enabled);
+	} catch (err) {
+		logger.error(`Failed to set ${detail(guild)} broadcast enabled in database`, err);
+		await interaction.reply(EphemReply(ErrorMsg(
+			`Failed to set broadcast flag. Try again?`
+		)));
+		return;
+	}
+
+	await interaction.reply(GoodMsg(
+		`Bans will ${enabled ? 'now' : 'no longer'} be broadcasted to other servers.`
+	));
 }
 
 /**
