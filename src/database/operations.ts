@@ -42,7 +42,7 @@ export interface ConfigRow {
 
 export interface GuildRow {
 	id: Snowflake;
-	joined_at: Date;
+	joined_at?: Date | null;
 	left_at?: Date | null;
 	name: string;
 }
