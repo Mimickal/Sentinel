@@ -8,6 +8,8 @@
  ******************************************************************************/
 import * as Discord from 'discord.js';
 import { createLogger, GlobalLogger } from '@mimickal/discord-logging';
+// @ts-ignore Library has no typescript definition.
+import cron from 'node-cron';
 
 import * as config from './config';
 
@@ -16,6 +18,7 @@ const logger = createLogger({ filename: config.Env.logfile });
 GlobalLogger.setGlobalLogger(logger);
 
 import * as events from './events';
+import { checkForDeletedUsers } from './schedule';
 
 // Everything operates on IDs, so we can safely rely on partials.
 const client = new Discord.Client({
@@ -43,6 +46,9 @@ client.on(Discord.Events.GuildBanRemove, events.onUserUnbanned);
 client.on(Discord.Events.GuildCreate, events.onGuildJoin);
 client.on(Discord.Events.GuildDelete, events.onGuildLeave);
 client.on(Discord.Events.InteractionCreate, events.onInteraction);
+
+// Every day at midnight
+cron.schedule('0 0 * * *', () => checkForDeletedUsers(client))
 
 logger.info(`Bot is starting with config: ${JSON.stringify({
 	...config.Env,

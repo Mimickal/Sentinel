@@ -56,7 +56,6 @@ export interface UserRow {
 // Row type constraints for individual operations
 type AddBanRow = Omit<BanRow, 'id'>;
 type AddUserRow = Omit<UserRow, 'deleted'>;
-type DeletedUserRow = Omit<UserRow, 'created_at'> & Partial<UserRow>;
 type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
 type FetchBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
 type SetConfigRow = Omit<ConfigRow, 'id'>;
@@ -134,10 +133,16 @@ export async function getUser(id: Snowflake): Promise<UserRow | undefined> {
 	return parseDates(row, ['created_at']);
 }
 
-export async function setUserDeleted(user: DeletedUserRow): Promise<void> {
-	await knex<DeletedUserRow>(Tables.USERS)
-		.update('deleted', user.deleted)
-		.where('id', '=', user.id);
+export async function getUndeletedUsers(): Promise<UserRow[]> {
+	return await knex<UserRow>(Tables.USERS)
+		.select()
+		.where('deleted', '=', false);
+}
+
+export async function setUserDeleted(userId: Snowflake): Promise<void> {
+	await knex<UserRow>(Tables.USERS)
+		.update('deleted', true)
+		.where('id', '=', userId);
 }
 
 // Fields in T with (possibly optional) Date https://stackoverflow.com/a/49752227
