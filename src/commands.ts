@@ -26,8 +26,8 @@ import {
 	downloadGuildBanItems,
 	GuildBanItem,
  } from './banlist';
-import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg } from './components';
-import { APP_NAME, GuildConfig, Package, UNKNOWN_ERR } from './config';
+import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg, WarnMsg } from './components';
+import { APP_NAME, GuildConfig, Package } from './config';
 
 const logger = GlobalLogger.logger;
 
@@ -228,8 +228,10 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 	// requireInGuild decorator guarantees this value is defined
 	const guild = interaction.guild!;
 	const reason = `${APP_NAME}: Imported from list`;
-	const userBans: Snowflake[] = [];
-	let errMsg: string | undefined;
+
+	let processed = 0;
+	const successBans: Snowflake[] = [];
+	const failedBans: Snowflake[] = [];
 
 	for await (const item of banItems) {
 		try {
@@ -239,39 +241,52 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 				guild, user, reason,
 				refBanId: item.init_ban_id ?? item.ban_id,
 			});
-			userBans.push(user.id);
-
-			// Give progress updates for large ban lists
-			if (userBans.length % 10 === 0) {
-				await interaction.editReply(InfoMsg(
-					`Loading ban list (${userBans.length}/${banItems.length})...`
-				));
-			}
+			successBans.push(item.user_id);
 		} catch (err) {
 			if (err instanceof DiscordAPIError) {
 				logger.warn(`Failed to ban User ${item.user_id} in ${detail(guild)}`, err);
-				errMsg = `Failed to ban ${userMention(item.user_id)}. ` +
-					'Do I have the right permissions?';
 			} else {
 				logger.error('Failed to add ban to database', err);
-				errMsg = UNKNOWN_ERR;
 			}
+			failedBans.push(item.user_id)
+		}
 
-			break;
+		processed++;
+
+		// Give progress updates for large ban lists
+		if (processed % 10 === 0) {
+			await interaction.editReply(InfoMsg(
+				`Loading ban list (${processed}/${banItems.length})...`
+			));
 		}
 	}
 
-	const messages = splitLongMessage([
-		errMsg ? `${errMsg}\n\n` : '',
-		'Successfully banned',
-		banItems.length === userBans.length
-			? `all ${banItems.length}`
-			: `${userBans.length}/${banItems.length}`,
-		'users:\n',
-		userBans.map(banId => userMention(banId)).join(' '),
-	].join(' '));
+	// This ridiculous block of code is just building a message to notify
+	// which bans were successful and which were not.
+	let msgText = '';
 
-	const Decorate = errMsg ? ErrorMsg : GoodMsg;
+	if (failedBans.length > 0) {
+		msgText += `Failed to ban ${
+			failedBans.length === banItems.length
+				? `all ${banItems.length}`
+				: `${failedBans.length} / ${banItems.length}`
+		} users. I may be missing permissions.\n${
+			failedBans.map(userMention).join(' ')
+		}\n\n`;
+	}
+
+	if (successBans.length > 0) {
+		msgText += `Successfully banned ${
+			successBans.length === banItems.length
+				? `all ${banItems.length}`
+				: `${successBans.length} / ${banItems.length}`
+		} users.\n${
+			successBans.map(userMention).join(' ')
+		}`;
+	}
+
+	const messages = splitLongMessage(msgText);
+	const Decorate = failedBans.length > 0 ? WarnMsg : GoodMsg;
 	const firstMessage = messages.shift()!;
 	await interaction.editReply(Decorate(firstMessage));
 	for await (const message of messages) {

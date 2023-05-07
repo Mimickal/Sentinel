@@ -44,7 +44,6 @@ client.on(Discord.Events.GuildCreate, events.onGuildJoin);
 client.on(Discord.Events.GuildDelete, events.onGuildLeave);
 client.on(Discord.Events.InteractionCreate, events.onInteraction);
 
-
 logger.info(`Bot is starting with config: ${JSON.stringify({
 	...config.Env,
 	token: '<REDACTED>',
