@@ -13,6 +13,7 @@
     "knex": "npx knex --knexfile src/database/knexfile.js",
     "register": "npx ts-node --logError ./src/register.ts",
     "start": "npx ts-node --logError . dev-config.json",
+    "start:prod": "NODE_ENV=production npx ts-node .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

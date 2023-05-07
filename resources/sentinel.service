@@ -15,8 +15,8 @@ After=network.target network-online.target
 Type=simple
 Restart=on-failure
 RestartSec=10
-Environment="NODE_ENV=production" "SENTINEL_DATABASE=/srv/discord/sentinel.sqlite3"
-ExecStart="<your start config here>"
+Environment="SENTINEL_DATABASE=/srv/discord/sentinel.sqlite3"
+ExecStart="npm run start:prod --prefix /srv/discord/Sentinel"
 
 [Install]
 WantedBy=default.target
