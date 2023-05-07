@@ -1,0 +1,22 @@
+# System-wide installation:
+# Put file in: /etc/systemd/system/
+# Start with: systemctl restart sentinel.service
+
+# User installation:
+# Put file in: ~/.config/systemd/user/
+# Start with: systemctl restart --user sentinel.service
+
+[Unit]
+Description=Sentinel Discord bot
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=10
+Environment="NODE_ENV=production" "SENTINEL_DATABASE=<path to database here>"
+ExecStart="<your start config here>"
+
+[Install]
+WantedBy=default.target

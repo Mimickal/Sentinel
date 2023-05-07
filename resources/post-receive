@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# This should go in the "hooks" folder of your bare deployment repo.
+# NOTE: You need to update this manually!
+
+TARGET="/srv/discord/Sentinel"
+TEMP="/tmp/discord/Sentinel.git"
+REPO="/srv/discord/Sentinel.git"
+NODE_ENV="production"
+
+# Download all the dependencies and stuff
+mkdir -p $TEMP
+/usr/bin/env git --work-tree=$TEMP --git-dir=$REPO checkout -f
+cd $TEMP
+/usr/bin/env npm ci
+NODE_ENV=$NODE_ENV /usr/bin/env npm run knex migrate:latest
+
+# Now install the code
+cd /
+rm -rf $TARGET
+mv $TEMP $TARGET
+
+# Restart the app
+/usr/bin/env systemctl restart sentinel.service
