@@ -15,7 +15,7 @@ After=network.target network-online.target
 Type=simple
 Restart=on-failure
 RestartSec=10
-Environment="NODE_ENV=production" "SENTINEL_DATABASE=<path to database here>"
+Environment="NODE_ENV=production" "SENTINEL_DATABASE=/srv/discord/sentinel.sqlite3"
 ExecStart="<your start config here>"
 
 [Install]
