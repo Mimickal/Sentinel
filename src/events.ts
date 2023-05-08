@@ -63,18 +63,13 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
 		return;
 	}
 
-	const alertChannel = guild.systemChannel;
-	if (!alertChannel) {
-		logger.warn('Guild has no alert channel and will not receive alerts.');
-	}
-
 	try {
 		await database.upsertGuild({
 			id: guild.id, // Should match guildRow.id
 			joined_at: guild.joinedAt,
 			name: guild.name,
 		});
-		await GuildConfig.setAlertChannel(guild.id, alertChannel?.id);
+		await GuildConfig.setAlertChannel(guild.id, null);
 		await GuildConfig.setBroadcast(guild.id, true);
 	} catch (err) {
 		logger.error(`Failed to add ${detail(guild)} to database`, err);

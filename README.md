@@ -39,7 +39,7 @@ No. Bans cut people off from a community, and should only be used when all else 
 
 1. <h3>Set an alert channel</h3>
 
-    By default, Sentinel will post alerts to your server's system alerts channel, if it has one. If not, the alert channel remains unset. Bans must be manually approved by a moderator, so you may want to give Sentinel its own channel. See [Commands](#commands) to change this.
+    This is the channel Sentinel posts alerts to. Bans must be manually approved by a moderator, so you may want to give Sentinel its own channel. See [Commands](#commands) to change this.
 
     **You will not receive ban alerts until you set an alert channel!**
 2. <h3>Set bot permissions</h3>
@@ -52,7 +52,7 @@ These commands can be used by anybody in your server with the "Ban Members" perm
 
 **Note:** Sentinel does not include a `/ban` command because Discord already has one built in. That command _can_ accept raw user IDs (even though its UI implies otherwise).
 
-- `/config alert-channel <channel>` - Sets the channel to output ban alerts to. This defaults to your server's system alert channel, if it has one.
+- `/config alert-channel <channel>` - Sets the channel to output ban alerts to. **This must be set before you get alerts!**
 - `/config broadcast enabled` - Enables or disables broadcasting your server's bans to other servers. This is enabled by default.
 - `/export-bans [reason filter]` - Exports the server's bans to a JSON file. An optional filter can also be specified to only export bans whose reason matches the filter. This filter supports Regex.
 - `/import-bans` - Imports a JSON ban list matching the format produced by `/export bans`. This is useful for sharing existing bans between servers.
