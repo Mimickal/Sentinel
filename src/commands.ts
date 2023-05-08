@@ -142,6 +142,7 @@ function requireBotOwner(func: Handler): Handler {
 		if (interaction.user.id === botOwnerId) {
 			return func(interaction);
 		} else {
+			logger.warn(`${detail(interaction.user)} tried to whitelist a guild`);
 			interaction.reply(EphemReply(InfoMsg(
 				'Only the bot owner can use this command!'
 			)));
