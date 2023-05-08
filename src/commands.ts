@@ -174,12 +174,12 @@ async function cmdInfo(interaction: ChatInputCommandInteraction): Promise<void> 
  * Sets a Guild's alert channel.
  */
 async function setAlertChannel(interaction: ChatInputCommandInteraction): Promise<void> {
-	const channel = interaction.options.getChannel('channel');
+	const channel = interaction.options.getChannel('channel', true);
 	if (![
 		ChannelType.GuildText,
 		ChannelType.PrivateThread,
 		ChannelType.PublicThread,
-	].includes(channel!.type)) {
+	].includes(channel.type)) {
 		await interaction.reply(EphemReply(ErrorMsg(
 			`Cannot use channel ${channel}! Please use a text channel.`
 		)));
@@ -188,8 +188,11 @@ async function setAlertChannel(interaction: ChatInputCommandInteraction): Promis
 
 	// requireInGuild decorator guarantees guild and channel are defined
 	const guild = interaction.guild!;
+	// TODO detail(channel) when supported
+	logger.info(`Setting ${detail(guild)} alert channel to Channel ${channel.id}`);
+
 	try {
-		await GuildConfig.setAlertChannel(guild.id, channel!.id)
+		await GuildConfig.setAlertChannel(guild.id, channel.id)
 	} catch (err) {
 		logger.error(`Failed to set ${detail(guild)} alert channel in database`, err);
 		await interaction.reply(EphemReply(ErrorMsg(
@@ -209,6 +212,8 @@ async function setBroadcast(interaction: ChatInputCommandInteraction): Promise<v
 
 	// requireInGuild decorator guarantees guild is defined
 	const guild = interaction.guild!;
+	logger.info(`Setting ${detail(guild)} broadcast to ${enabled}`);
+
 	try {
 		await GuildConfig.setBroadcast(guild.id, enabled);
 	} catch (err) {
@@ -261,6 +266,7 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 		return;
 	}
 
+	logger.info(`Loading ban list into ${detail(interaction.guild)}`);
 	await interaction.reply(InfoMsg('Loading ban list...'));
 
 	let banItems: GuildBanItem[];
@@ -309,6 +315,8 @@ async function importGuildBans(interaction: ChatInputCommandInteraction): Promis
 			));
 		}
 	}
+
+	logger.info(`Finished loading banlist into ${detail(interaction.guild)}`);
 
 	// This ridiculous block of code is just building a message to notify
 	// which bans were successful and which were not.
