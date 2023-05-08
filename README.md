@@ -48,6 +48,8 @@ No. Bans cut people off from a community, and should only be used when all else 
 
 # Commands
 
+These commands can be used by anybody in your server with the "Ban Members" permission.
+
 **Note:** Sentinel does not include a `/ban` command because Discord already has one built in. That command _can_ accept raw user IDs (even though its UI implies otherwise).
 
 - `/config alert-channel <channel>` - Sets the channel to output ban alerts to. This defaults to your server's system alert channel, if it has one.
