@@ -13,7 +13,10 @@ const GUILDS = 'guilds';
 const ID_LEN = 20;
 
 /**
- * Make {@link GUILDS}.joined_at nullable and remove default value.
+ * Changes {@link GUILDS} to double as a whitelist table:
+ *   - Make `joined_at` nullable with no default value.
+ *   - Make `name` nullable.
+ *   - Remove `left_at` since we clear guild entirely on leave.
  *
  * SQLite3 does not support alter table statements,
  * so we need to make a new table and copy the old data over.
@@ -26,17 +29,19 @@ exports.up = async function(knex) {
 
 	await knex.schema.renameTable(GUILDS, GUILDS_OLD);
 
-	// Same as old table, except joined_at is nullable with no default.
 	await knex.schema.createTable(GUILDS, table => {
 		table.string   ('id', ID_LEN).primary();
-		table.string   ('name',  100).notNullable();
+		table.string   ('name',  100).nullable();
 		table.timestamp('joined_at' ).nullable();
-		table.timestamp('left_at'   ).nullable();
 	});
 
-	// Copy all the data over to the new table
+	// Copy all the data over to the new table, omitting left_at.
 	await knex(GUILDS).insert(
-		await knex(GUILDS_OLD).select()
+		(await knex(GUILDS_OLD).select()).map(row => ({
+			id: row.id,
+			name: row.name,
+			joined_at: row.joined_at,
+		}))
 	);
 };
 

@@ -44,10 +44,24 @@ export async function onReady(client: Client): Promise<void> {
 
 /**
  * Event handler for joining a Guild.
- * Creates a record for the Guild and all of its existing bans in the database.
+ *
+ * If the Guild is on the whitelist (aka we have a record for it):
+ *   - Set joined_at date
+ *   - Set up initial config
+ *   - Load all of its existing bans into the database.
+ *
+ * If the Guild is not on the whitelist, leave immediately.
  */
 export async function onGuildJoin(guild: Guild): Promise<void> {
 	logger.info(`Joined ${detail(guild)}`);
+	await guild.fetch();
+
+	const guildRow = await database.getGuild(guild.id);
+	if (!guildRow) {
+		logger.warn(`${detail(guild)} is not on the whitelist`);
+		await guild.leave();
+		return;
+	}
 
 	const alertChannel = guild.systemChannel;
 	if (!alertChannel) {
@@ -56,9 +70,8 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
 
 	try {
 		await database.upsertGuild({
-			id: guild.id,
+			id: guild.id, // Should match guildRow.id
 			joined_at: guild.joinedAt,
-			left_at: null,
 			name: guild.name,
 		});
 		await GuildConfig.setAlertChannel(guild.id, alertChannel?.id);
@@ -83,15 +96,12 @@ export async function onGuildJoin(guild: Guild): Promise<void> {
 
 /**
  * Event handler for leaving a Guild.
- * Updates the database row for this Guild with the time of leaving.
+ * Clears all recorded data for the Guild.
  */
 export async function onGuildLeave(guild: Guild): Promise<void> {
 	logger.info(`Left ${detail(guild)}`);
 	try {
-		await database.setGuildLeft({
-			id: guild.id,
-			left_at: new Date(Date.now()),
-		});
+		await database.clearDataForGuild(guild.id);
 	} catch (err) {
 		logger.error(`Failed to remove ${detail(guild)} from database`, err);
 	}

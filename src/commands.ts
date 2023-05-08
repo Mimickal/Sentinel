@@ -13,6 +13,7 @@ import {
 	DiscordAPIError,
 	PermissionFlagsBits,
 	Snowflake,
+	SnowflakeUtil,
 	userMention,
 } from 'discord.js';
 // @ts-ignore
@@ -27,7 +28,8 @@ import {
 	GuildBanItem,
  } from './banlist';
 import { EphemReply, ErrorMsg, FileReply, GoodMsg, InfoMsg, WarnMsg } from './components';
-import { APP_NAME, GuildConfig, Package } from './config';
+import { APP_NAME, GuildConfig, Package, UNKNOWN_ERR } from './config';
+import * as database from './database';
 
 const logger = GlobalLogger.logger;
 
@@ -98,7 +100,54 @@ export default new SlashCommandRegistry()
 			.setDescription('A banlist JSON file from the /export-bans command')
 			.setRequired(true)
 		)
+	)
+	// @ts-ignore
+	.addCommand(command => command
+		.setName('whitelist')
+		.setDescription('Change the bot server whitelist')
+		.setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+		// @ts-ignore
+		.addSubcommand(subcommand => subcommand
+			.setName('add')
+			.setDescription('Adds a server to the bot whitelist')
+			.setHandler(requireBotOwner(guildWhitelistAdd))
+			// @ts-ignore
+			.addStringOption(option => option
+				.setName('server')
+				.setDescription('The ID of the server to whitelist')
+				.setRequired(true)
+			)
+		)
+		// @ts-ignore
+		.addSubcommand(subcommand => subcommand
+			.setName('remove')
+			.setDescription('Removes a server from the bot whitelist')
+			.setHandler(requireBotOwner(guildWhitelistRemove))
+			// @ts-ignore
+			.addStringOption(option => option
+				.setName('server')
+				.setDescription('The ID of the server to remove from the whitelist')
+				.setRequired(true)
+			)
+		)
 	);
+
+/** Middleware that ensures the interaction is being sent by the bot's owner. */
+function requireBotOwner(func: Handler): Handler {
+	return async (interaction) => {
+		// Need to fetch to guarantee owner is defined
+		await interaction.client.application.fetch();
+
+		const botOwnerId = interaction.client.application.owner?.id;
+		if (interaction.user.id === botOwnerId) {
+			return func(interaction);
+		} else {
+			interaction.reply(EphemReply(InfoMsg(
+				'Only the bot owner can use this command!'
+			)));
+		}
+	};
+}
 
 /** Middleware that ensures an interaction is a chat slash command in a Guild. */
 function requireInGuild(func: Handler): Handler {
@@ -312,4 +361,71 @@ function splitLongMessage(content: string): string[] {
 	parts.push(curMsg);
 
 	return parts;
+}
+
+/**
+ * Adds the given Guild to the bot's whitelist.
+ * This will allow the bot to join a guild without immediately leaving.
+ */
+async function guildWhitelistAdd(interaction: ChatInputCommandInteraction): Promise<void> {
+	// TODO sure would be nice if we had a getServerOption helper
+	const guildId = interaction.options.getString('server', true);
+	try {
+		SnowflakeUtil.decode(guildId); // Throws SyntaxError if invalid
+
+		logger.info(`Adding Guild ${guildId} to whitelist`);
+
+		await database.upsertGuild({ id: guildId });
+		await interaction.reply(GoodMsg(`Added Guild ${guildId} to the whitelist.`));
+	} catch (err) {
+		if (err instanceof SyntaxError) {
+			logger.warn(`Invalid whitelist server ID "${guildId}"`);
+		} else {
+			logger.error(`Something went wrong adding Server ${guildId} to whitelist`, err);
+		}
+
+		await interaction.reply(EphemReply(ErrorMsg(
+			err instanceof SyntaxError ? 'Invalid server ID' : UNKNOWN_ERR
+		)));
+	}
+}
+
+/**
+ * Removes the given Guild from the bot's whitelist.
+ * If the bot is already in that Guild, it will leave the Guild and delete any
+ * Guild data it is storing.
+ */
+async function guildWhitelistRemove(interaction: ChatInputCommandInteraction): Promise<void> {
+	const guildId = interaction.options.getString('server', true);
+	try {
+		SnowflakeUtil.decode(guildId); // Throws SyntaxError if invalid
+
+		logger.info(`Removing Guild ${guildId} from whitelist`);
+
+		await database.clearDataForGuild(guildId);
+	} catch (err) {
+		if (err instanceof SyntaxError) {
+			logger.warn(`Invalid whitelist server ID "${guildId}"`);
+		} else {
+			logger.error(`Something went wrong removing Server ${guildId} from whitelist`, err);
+		}
+
+		await interaction.reply(EphemReply(ErrorMsg(
+			err instanceof SyntaxError ? 'Invalid server ID' : UNKNOWN_ERR
+		)));
+		return;
+	}
+
+	let left = false;
+	try {
+		const guild = await interaction.client.guilds.fetch(guildId);
+		await guild.leave();
+		left = true;
+	} catch (err) {
+		logger.warn(`Didn't leave Guild ${guildId}`);
+	}
+
+	await interaction.reply(WarnMsg(
+		`Removed Guild ${guildId} from the whitelist. ${left ? 'Bot left guild.': ''}`
+	));
 }

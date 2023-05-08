@@ -43,8 +43,7 @@ export interface ConfigRow {
 export interface GuildRow {
 	id: Snowflake;
 	joined_at?: Date | null;
-	left_at?: Date | null;
-	name: string;
+	name?: string | null;
 }
 
 export interface UserRow {
@@ -56,7 +55,6 @@ export interface UserRow {
 // Row type constraints for individual operations
 type AddBanRow = Omit<BanRow, 'id'>;
 type AddUserRow = Omit<UserRow, 'deleted'>;
-type LeftGuildRow = Pick<GuildRow, 'id'|'left_at'>;
 type FetchBanRow = Pick<BanRow, 'guild_id'|'user_id'> | Pick<BanRow, 'id'>;
 type SetConfigRow = Omit<ConfigRow, 'id'>;
 
@@ -102,22 +100,23 @@ export async function setGuildConfigValue(config: SetConfigRow): Promise<void> {
 		.onConflict(['guild_id', 'key']).merge();
 }
 
+export async function getGuild(guildId: Snowflake): Promise<GuildRow|undefined> {
+	const row = await knex<GuildRow>(Tables.GUILDS)
+		.first()
+		.where('id', '=', guildId);
+	return parseDates(row, ['joined_at']);
+}
+
 export async function getGuilds(): Promise<GuildRow[]> {
 	const guildRows = await knex<GuildRow>(Tables.GUILDS)
 		.select();
-	return guildRows.map(row => parseDates(row, ['joined_at', 'left_at'])!)
+	return guildRows.map(row => parseDates(row, ['joined_at'])!)
 }
 
 export async function upsertGuild(guild: GuildRow): Promise<void> {
 	await knex<GuildRow>(Tables.GUILDS)
 		.insert(guild)
 		.onConflict('id').merge();
-}
-
-export async function setGuildLeft(guild: LeftGuildRow): Promise<void> {
-	await knex<LeftGuildRow>(Tables.GUILDS)
-		.update('left_at', guild.left_at)
-		.where('id', '=', guild.id);
 }
 
 export async function addUser(user: AddUserRow): Promise<void> {
@@ -143,6 +142,20 @@ export async function setUserDeleted(userId: Snowflake): Promise<void> {
 	await knex<UserRow>(Tables.USERS)
 		.update('deleted', true)
 		.where('id', '=', userId);
+}
+
+export async function clearDataForGuild(guildId: Snowflake): Promise<void> {
+	await knex<BanRow>(Tables.BANS)
+		.delete()
+		.where('guild_id', '=', guildId);
+
+	await knex<ConfigRow>(Tables.CONFIG)
+		.delete()
+		.where('guild_id', '=', guildId);
+
+	await knex<GuildRow>(Tables.GUILDS)
+		.delete()
+		.where('id', '=', guildId);
 }
 
 // Fields in T with (possibly optional) Date https://stackoverflow.com/a/49752227
