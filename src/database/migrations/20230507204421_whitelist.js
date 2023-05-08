@@ -36,13 +36,14 @@ exports.up = async function(knex) {
 	});
 
 	// Copy all the data over to the new table, omitting left_at.
-	await knex(GUILDS).insert(
-		(await knex(GUILDS_OLD).select()).map(row => ({
-			id: row.id,
-			name: row.name,
-			joined_at: row.joined_at,
-		}))
-	);
+	const rows = (await knex(GUILDS_OLD).select()).map(row => ({
+		id: row.id,
+		name: row.name,
+		joined_at: row.joined_at,
+	}));
+	if (rows.length > 0) {
+		await knex(GUILDS).insert(rows);
+	}
 };
 
 /**
