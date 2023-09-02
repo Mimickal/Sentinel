@@ -36,6 +36,9 @@ interface BanIds {
  * admin clicking it, if they ever click it at all. Because of this, we need to
  * embed information about the ban in the button itself. The only way to do this
  * is through its ID.
+ *
+ * I guess an alternative would be using a database or something, but I'm not
+ * setting up a whole-ass database when this works fine (albeit a little weird).
  */
 export class BanButton extends ActionRowBuilder {
 	static ID_PREFIX = 'ban';
@@ -62,6 +65,18 @@ export class BanButton extends ActionRowBuilder {
 			)
 			.setLabel('Ban')
 			.setStyle(ButtonStyle.Danger)
+		);
+	}
+}
+
+export class DisabledButton extends ActionRowBuilder {
+	constructor(label: string) {
+		super();
+		this.addComponents(new ButtonBuilder()
+			.setCustomId('Ignored')
+			.setDisabled(true)
+			.setLabel(label)
+			.setStyle(ButtonStyle.Secondary)
 		);
 	}
 }

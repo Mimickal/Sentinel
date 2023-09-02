@@ -22,6 +22,7 @@ import commands from './commands';
 import {
 	BanEmbed,
 	BanButton,
+	DisabledButton,
 	ErrorMsg,
 	GoodMsg,
 	InfoMsg,
@@ -190,7 +191,7 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 			timestamp: bannedAt,
 			inGuildSince: inGuildSince,
 		})],
-		// @ts-ignore TODO ask djs support why this type isn't playing nice.
+		// @ts-expect-error TODO ask djs support why this type isn't playing nice.
 		components: [new BanButton({ userId: ban.user.id, banId })],
 	});
 }
@@ -252,6 +253,18 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 			));
 		}
 		return;
+	}
+
+	try {
+		await interaction.message.edit({
+			// @ts-expect-error TODO ask djs devs what's up
+			components: [new DisabledButton('Banned')],
+		});
+	} catch (err) {
+		// If we fail to disable this button, the worst thing that happens is
+		// someone might click it again, which we account for. The ban already
+		// happened, so just log this failure and move on.
+		logger.warn(`Failed to disable ban button on ${detail(interaction.message)}`);
 	}
 
 	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
