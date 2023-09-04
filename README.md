@@ -4,9 +4,9 @@
 src="https://www.gnu.org/graphics/agplv3-155x51.png">
 </a>
 
-Sentinel is a Discord bot that shares bans between servers.
+Sentinel is a Discord bot that shares bans and unbans between servers.
 
-When a user is banned in another server, Sentinel will post an alert like this to your configured alert channel:
+When a user is banned (or unbanned) in another server, Sentinel will post an alert like this to your configured alert channel:
 
 ![](docs/example.png)
 
@@ -34,6 +34,10 @@ Not right now. Currently Sentinel is in private preview, so every server it's in
 ## Can Sentinel auto-ban reported users?
 
 No. Bans cut people off from a community, and should only be used when all else has failed. Final approval on a ban should always require a human. Sentinel is a moderation tool, not a moderation replacement.
+
+## I banned someone by accident. Can I fix that?
+
+Yes, just unban them like you normally would. The bot will broadcast a notification for the unban, the same way it did for the ban. Do note that the original ban notification will still go out to other servers.
 
 # Setup
 
