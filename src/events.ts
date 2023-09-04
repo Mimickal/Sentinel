@@ -17,7 +17,13 @@ import {
 } from 'discord.js';
 import { detail, GlobalLogger } from '@mimickal/discord-logging';
 
-import { banUser, recordUserBan } from './ban';
+import {
+	banCameFromThisBot,
+	banGuildHasBroadcastingEnabled,
+	banUser,
+	fetchGuildAlertChannel,
+	recordUserBan,
+} from './ban';
 import commands from './commands';
 import {
 	BanEmbed,
@@ -32,6 +38,13 @@ import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { GuildRow, RowId } from './database';
 import { fetchAll, ignoreError } from './util';
+
+interface BanAlert {
+	ban: GuildBan;
+	guildRow: GuildRow;
+	timestamp: Date;
+	banId?: RowId;
+}
 
 const logger = GlobalLogger.logger;
 
@@ -123,29 +136,26 @@ export async function onInteraction(interaction: BaseInteraction): Promise<void>
 
 /** Event handler for a User being banned. */
 export async function onUserBanned(ban: GuildBan): Promise<void> {
+	// Ban doesn't have a timestamp, so we use our own. Close enough.
+	const timestamp = new Date(Date.now());
+
 	logger.info(`${detail(ban.guild)} banned ${detail(ban.user)}`);
 	await ban.fetch(); // Sometimes need to fetch to get reason
 
-	// Ban doesn't have a timestamp, so we use our own. Close enough.
-	const bannedAt = new Date(Date.now());
 	const banId = await recordUserBan({
-		bannedAt: bannedAt,
+		bannedAt: timestamp,
 		guildId: ban.guild.id,
 		reason: ban.reason,
 		user: ban.user,
 	});
 
-	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
-	if (ban.reason?.startsWith(APP_NAME)) return;
-
-	// Don't broadcast bans if the originating guild has it disabled
-	const guildConfig = await GuildConfig.for(ban.guild.id);
-	if (!guildConfig.broadcast) return;
+	if (banCameFromThisBot(ban)) return;
+	if (!await banGuildHasBroadcastingEnabled(ban)) return;
 
 	const guildRows = await database.getGuilds();
 	for await (const guildRow of guildRows) {
 		try {
-			await sendBanAlert({ ban, bannedAt, banId, guildRow });
+			await sendBanAlert({ ban, banId, guildRow, timestamp });
 		} catch (err) {
 			// Can't use detail because we only have the Guild ID here.
 			logger.warn(`Failed to send ban alert to Guild ${guildRow.id}`, err);
@@ -153,19 +163,15 @@ export async function onUserBanned(ban: GuildBan): Promise<void> {
 	}
 }
 
-async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
-	ban: GuildBan;
-	bannedAt: Date;
-	guildRow: GuildRow;
-	banId?: RowId;
-}): Promise<void> {
+async function sendBanAlert({
+	ban, banId, guildRow, timestamp,
+}: BanAlert): Promise<void> {
 	// Don't send alert to the guild the ban came from.
 	if (guildRow.id === ban.guild.id) return;
 
-	const guildConfig = await GuildConfig.for(guildRow.id);
-
 	// Don't send alert if we, you know, can't.
-	if (!guildConfig.alertChannelId) return;
+	const alertChannel = await fetchGuildAlertChannel(ban);
+	if (!alertChannel) return;
 
 	// Don't send alert if user is already banned in this guild.
 	const existingBan = await database.getBan({
@@ -174,23 +180,13 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	});
 	if (existingBan) return;
 
-	const channel = await ban.client.channels.fetch(guildConfig.alertChannelId);
-	if (!channel?.isTextBased()) {
-		throw new Error(`Invalid channel ${guildConfig.alertChannelId}`);
-	}
-
 	const guild = await ban.client.guilds.fetch(guildRow.id);
-	let inGuildSince: Date | undefined;
-	try {
-		inGuildSince = (await guild.members.fetch(ban.user.id)).joinedAt ?? undefined;
-	} catch {} // Throws an error if member is not in Guild.
+	const inGuildSince = await ignoreError(async () => (
+		(await guild.members.fetch(ban.user.id)).joinedAt ?? undefined
+	));
 
-	await channel.send({
-		embeds: [new BanEmbed({
-			ban: ban,
-			timestamp: bannedAt,
-			inGuildSince: inGuildSince,
-		})],
+	await alertChannel.send({
+		embeds: [new BanEmbed({ ban, timestamp, inGuildSince })],
 		// @ts-expect-error TODO ask djs support why this type isn't playing nice.
 		components: [new BanButton({ userId: ban.user.id, banId })],
 	});
