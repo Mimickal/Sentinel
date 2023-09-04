@@ -93,3 +93,15 @@ export async function* fetchAll<
 		cursor = page.lastKey();
 	} while (page.size === limit);
 }
+
+/**
+ * Resolves a Promise and ignores any error it might throw.
+ * This is useful because Discord.js throws an error when you try to do things
+ * like fetching a ban for a user that isn't banned. For our purposes, it's
+ * better to have `undefined` instead.
+ */
+export async function ignoreError<T>(func: () => Promise<T>): Promise<T | undefined> {
+	try {
+		return await func();
+	} catch {}
+}

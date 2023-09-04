@@ -31,7 +31,7 @@ import {
 import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { GuildRow, RowId } from './database';
-import { fetchAll } from './util';
+import { fetchAll, ignoreError } from './util';
 
 const logger = GlobalLogger.logger;
 
@@ -223,23 +223,27 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 
 	const { userId, banId } = BanButton.getBanIds(interaction.customId)!;
 
-	const existingBan = await database.getBan({
+	const existingDiscordBan = await ignoreError(() => guild.bans.fetch(userId));
+	const existingBotBan = await database.getBan({
 		guild_id: guild.id,
 		user_id: userId,
 	});
-	if (existingBan) {
+
+	if (existingDiscordBan && existingBotBan) {
 		await interaction.reply(InfoMsg('User already banned'));
+		await disableButton(interaction, 'Banned');
 		return;
 	}
 
 	logger.info(`Button banning User ${userId} in ${detail(guild)}`);
-	const reason = `${APP_NAME}: Confirmed by admin`;
+	const reason = `${APP_NAME}: Ban confirmed by admin`;
 
 	try {
 		// The ban event will also try to store the ban, but we won't have
 		// access to the reference banId there, so just do the ban here.
 		const user = await interaction.client.users.fetch(userId);
 		await banUser({ guild, reason, user, refBanId: banId });
+		await disableButton(interaction, 'Banned');
 	} catch (err) {
 		if (err instanceof DiscordAPIError) {
 			await interaction.reply(ErrorMsg(
@@ -255,10 +259,17 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 		return;
 	}
 
+	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
+}
+
+async function disableButton(
+	interaction: ButtonInteraction,
+	label: string,
+): Promise<void> {
 	try {
 		await interaction.message.edit({
 			// @ts-expect-error TODO ask djs devs what's up
-			components: [new DisabledButton('Banned')],
+			components: [new DisabledButton(label)],
 		});
 	} catch (err) {
 		// If we fail to disable this button, the worst thing that happens is
@@ -266,6 +277,4 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 		// happened, so just log this failure and move on.
 		logger.warn(`Failed to disable ban button on ${detail(interaction.message)}`);
 	}
-
-	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
 }
