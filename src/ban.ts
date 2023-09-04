@@ -49,6 +49,22 @@ export async function recordUserBan({ bannedAt, guildId, reason, refBanId, user 
 	}
 }
 
+/** Removes a Ban from the database, logging any errors. */
+export async function recordUserUnban({ guildId, userId }: {
+	guildId: Snowflake;
+	userId: Snowflake;
+}): Promise<RowId> {
+	try {
+		return await database.removeBan({
+			guild_id: guildId,
+			user_id: userId,
+		});
+	} catch (err) {
+		logger.error('Failed to remove ban from database', err);
+		throw err;
+	}
+}
+
 /**
  * Bans the given User in the given Guild, and persists the ban to the database.
  * We issue these bans, so typing is a little more restrictive

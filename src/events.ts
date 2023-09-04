@@ -23,6 +23,7 @@ import {
 	banUser,
 	fetchGuildAlertChannel,
 	recordUserBan,
+	recordUserUnban,
 } from './ban';
 import commands from './commands';
 import {
@@ -33,6 +34,8 @@ import {
 	GoodMsg,
 	InfoMsg,
 	WarnMsg,
+	UnbanEmbed,
+	UnbanButton,
 } from './components';
 import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
@@ -138,8 +141,8 @@ export async function onInteraction(interaction: BaseInteraction): Promise<void>
 export async function onUserBanned(ban: GuildBan): Promise<void> {
 	// Ban doesn't have a timestamp, so we use our own. Close enough.
 	const timestamp = new Date(Date.now());
-
 	logger.info(`${detail(ban.guild)} banned ${detail(ban.user)}`);
+
 	await ban.fetch(); // Sometimes need to fetch to get reason
 
 	const banId = await recordUserBan({
@@ -194,17 +197,52 @@ async function sendBanAlert({
 
 /** Event handler for a User being unbanned. */
 export async function onUserUnbanned(ban: GuildBan): Promise<void> {
+	// Ban doesn't have a timestamp, so we use our own. Close enough (still).
+	const timestamp = new Date(Date.now());
 	logger.info(`${detail(ban.guild)} unbanned ${detail(ban.user)}`);
 
-	try {
-		await database.removeBan({
-			guild_id: ban.guild.id,
-			user_id: ban.user.id,
-		});
-	} catch (err) {
-		logger.error(`Failed to remove ${detail(ban)} from database`, err);
+	const banId = await recordUserUnban({
+		guildId: ban.guild.id,
+		userId: ban.user.id,
+	});
+
+	if (banCameFromThisBot(ban)) return;
+	if (!(await banGuildHasBroadcastingEnabled(ban))) return;
+
+	const guildRows = await database.getGuilds();
+	for await (const guildRow of guildRows) {
+		try {
+			await sendUnBanAlert({ ban, banId, guildRow, timestamp });
+		} catch (err) {
+			// Can't use detail because we only have the Guild ID here.
+			logger.warn(`Failed to send unban alert to Guild ${guildRow.id}`, err);
+		}
 	}
-	// TODO do we want to alert other servers?
+}
+
+async function sendUnBanAlert({
+	ban, banId, guildRow, timestamp
+}: BanAlert): Promise<void> {
+	// Don't send unban to the guild the unban game from.
+	if (guildRow.id === ban.guild.id) return;
+
+	// Don't send unban if we can't.
+	const alertChannel = await fetchGuildAlertChannel(ban);
+	if (!alertChannel) return;
+
+	// DO send unban alert even if the user isn't banned.
+	// We need to correct any previous ban alert we may have sent.
+	const existingBan = await database.getBan({
+		guild_id: guildRow.id,
+		user_id: ban.user.id,
+	});
+	const bannedSince = existingBan?.banned_at;
+
+	await alertChannel.send({
+		embeds: [new UnbanEmbed({ ban, bannedSince, timestamp })],
+		// @ts-expect-error TODO ask djs support why this type isn't playing nice.
+		components: [new UnbanButton({ userId: ban.user.id, banId })],
+	});
 }
 
 /** Handler for a button press. */
