@@ -6,9 +6,17 @@
  * See LICENSE or <https://www.gnu.org/licenses/agpl-3.0.en.html>
  * for more information.
  ******************************************************************************/
-import { DiscordAPIError, Guild, Snowflake, User } from 'discord.js';
+import {
+	DiscordAPIError,
+	Guild,
+	GuildBan,
+	Snowflake,
+	TextBasedChannel,
+	User,
+} from 'discord.js';
 import { GlobalLogger } from '@mimickal/discord-logging';
 
+import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { RowId } from './database';
 
@@ -41,6 +49,22 @@ export async function recordUserBan({ bannedAt, guildId, reason, refBanId, user 
 	}
 }
 
+/** Removes a Ban from the database, logging any errors. */
+export async function recordUserUnban({ guildId, userId }: {
+	guildId: Snowflake;
+	userId: Snowflake;
+}): Promise<RowId> {
+	try {
+		return await database.removeBan({
+			guild_id: guildId,
+			user_id: userId,
+		});
+	} catch (err) {
+		logger.error('Failed to remove ban from database', err);
+		throw err;
+	}
+}
+
 /**
  * Bans the given User in the given Guild, and persists the ban to the database.
  * We issue these bans, so typing is a little more restrictive
@@ -64,4 +88,53 @@ export async function banUser({ guild, reason, refBanId, user }: {
 		refBanId: refBanId,
 		user: user,
 	});
+}
+
+/**
+ * Unbans the given User in the given Guild, and persists the ban to the
+ * database.
+ *
+ * @reject {@link DiscordAPIError} if we fail to do the unban in Discord,
+ * otherwise whatever Knex throws for failed queries.
+ */
+export async function unbanUser({ guild, reason, userId }: {
+	guild: Guild;
+	reason: string;
+	userId: Snowflake;
+}): Promise<RowId> {
+	await guild.bans.remove(userId, reason)
+
+	return await recordUserUnban({
+		guildId: guild.id,
+		userId: userId,
+	});
+}
+
+/** Uses the reason on a ban to determine if the operation came from this bot. */
+export function banCameFromThisBot(ban: GuildBan): boolean {
+	// Kind of a hack, but it works.
+	return ban.reason?.startsWith(APP_NAME) ?? false;
+}
+
+/**
+ * Returns whether or not the guild the given ban came from has
+ * broadcasting enabled.
+ */
+export async function banGuildHasBroadcastingEnabled(ban: GuildBan): Promise<boolean> {
+	const guildConfig = await GuildConfig.for(ban.guild.id);
+	return guildConfig.broadcast ?? false;
+}
+
+/** Gets the configured alert channel for the guild the given ban came from. */
+export async function fetchGuildAlertChannel(ban: GuildBan): Promise<TextBasedChannel | null> {
+	const guildConfig = await GuildConfig.for(ban.guild.id);
+	if (!guildConfig.alertChannelId) return null;
+
+	// Verify this is a channel we can actually send messages to.
+	const alertChannel = await ban.client.channels.fetch(guildConfig.alertChannelId);
+	if (!alertChannel?.isTextBased() || alertChannel.hasOwnProperty('send')) {
+		throw new Error(`Invalid channel ${guildConfig.alertChannelId}`);
+	}
+
+	return alertChannel;
 }

@@ -82,10 +82,18 @@ export async function getGuildBans(guildId: Snowflake): Promise<BanRow[]> {
 		.where('guild_id', '=', guildId);
 }
 
-export async function removeBan(ban: FetchBanRow): Promise<void> {
-	await knex<FetchBanRow>(Tables.BANS)
+export async function removeBan(ban: FetchBanRow): Promise<RowId> {
+	// Delete returning isn't playing nice so we do this instead.
+	// Yes, this introduces a race condition, but we'll probably never hit it.
+	const returned = await knex<BanRow>(Tables.BANS)
+		.select()
+		.where(ban);
+
+	await knex<BanRow>(Tables.BANS)
 		.delete()
 		.where(ban);
+
+	return returned[0]?.id;
 }
 
 export async function getGuildConfig(id: Snowflake): Promise<ConfigRow[]> {

@@ -10,14 +10,14 @@ import {
 	bold,
 	ChannelType,
 	ChatInputCommandInteraction,
+	CommandInteraction,
 	DiscordAPIError,
 	PermissionFlagsBits,
 	Snowflake,
 	SnowflakeUtil,
 	userMention,
 } from 'discord.js';
-// @ts-ignore
-import { SlashCommandRegistry } from 'discord-command-registry';
+import { SlashCommandRegistry, Handler } from 'discord-command-registry';
 import { detail, GlobalLogger } from '@mimickal/discord-logging';
 
 import { banUser } from './ban';
@@ -33,11 +33,7 @@ import * as database from './database';
 
 const logger = GlobalLogger.logger;
 
-type Handler = (interaction: ChatInputCommandInteraction) => Promise<void>;
-
-// Ok guys, I get it. I'll port this library to TypeScript soon (TM).
 export default new SlashCommandRegistry()
-	// @ts-ignore
 	.addCommand(command => command
 		.setName('info')
 		.setDescription(
@@ -45,29 +41,24 @@ export default new SlashCommandRegistry()
 		)
 		.setHandler(cmdInfo)
 	)
-	// @ts-ignore
 	.addCommand(command => command
 		.setName('config')
 		.setDescription('Change some configuration for the bot')
 		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-		// @ts-ignore
 		.addSubcommand(subcommand => subcommand
 			.setName('alert-channel')
 			.setDescription('Sets the channel to send bot alerts')
 			.setHandler(requireInGuild(setAlertChannel))
-			// @ts-ignore
 			.addChannelOption(option => option
 				.setName('channel')
 				.setDescription('The channel to send bot alerts')
 				.setRequired(true)
 			)
 		)
-		// @ts-ignore
 		.addSubcommand(subcommand => subcommand
 			.setName('broadcast')
 			.setDescription("Enable or disable broadcasting this server's bans to other servers")
 			.setHandler(requireInGuild(setBroadcast))
-			// @ts-ignore
 			.addBooleanOption(option => option
 				.setName('enabled')
 				.setDescription("Broadcast this server's bans?")
@@ -75,55 +66,46 @@ export default new SlashCommandRegistry()
 			)
 		)
 	)
-	// @ts-ignore
 	.addCommand(command => command
 		.setName('export-bans')
 		.setDescription('Exports bans to a file')
 		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
 		.setHandler(requireInGuild(exportGuildBans))
-		// @ts-ignore
 		.addStringOption(option => option
 			.setName('pattern')
 			.setDescription('Only export bans whose reason matches this pattern. Allows regex.')
 			.setRequired(false)
 		)
 	)
-	// @ts-ignore
 	.addCommand(command => command
 		.setName('import-bans')
 		.setDescription('Import bans from a file')
 		.setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
 		.setHandler(requireInGuild(importGuildBans))
-		// @ts-ignore
 		.addAttachmentOption(option => option
 			.setName('banlist')
 			.setDescription('A banlist JSON file from the /export-bans command')
 			.setRequired(true)
 		)
 	)
-	// @ts-ignore
 	.addCommand(command => command
 		.setName('whitelist')
 		.setDescription('Change the bot server whitelist')
 		.setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-		// @ts-ignore
 		.addSubcommand(subcommand => subcommand
 			.setName('add')
 			.setDescription('Adds a server to the bot whitelist')
 			.setHandler(requireBotOwner(guildWhitelistAdd))
-			// @ts-ignore
 			.addStringOption(option => option
 				.setName('server')
 				.setDescription('The ID of the server to whitelist')
 				.setRequired(true)
 			)
 		)
-		// @ts-ignore
 		.addSubcommand(subcommand => subcommand
 			.setName('remove')
 			.setDescription('Removes a server from the bot whitelist')
 			.setHandler(requireBotOwner(guildWhitelistRemove))
-			// @ts-ignore
 			.addStringOption(option => option
 				.setName('server')
 				.setDescription('The ID of the server to remove from the whitelist')
@@ -133,7 +115,7 @@ export default new SlashCommandRegistry()
 	);
 
 /** Middleware that ensures the interaction is being sent by the bot's owner. */
-function requireBotOwner(func: Handler): Handler {
+function requireBotOwner<T extends CommandInteraction>(func: Handler<T>): Handler<T> {
 	return async (interaction) => {
 		// Need to fetch to guarantee owner is defined
 		await interaction.client.application.fetch();
@@ -151,7 +133,7 @@ function requireBotOwner(func: Handler): Handler {
 }
 
 /** Middleware that ensures an interaction is a chat slash command in a Guild. */
-function requireInGuild(func: Handler): Handler {
+function requireInGuild<T extends CommandInteraction>(func: Handler<T>): Handler<T> {
 	return async (interaction) => {
 		if (!interaction.inGuild() && !interaction.isChatInputCommand()) return;
 

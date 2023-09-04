@@ -8,60 +8,119 @@
  ******************************************************************************/
 import { formatDistance } from 'date-fns';
 import {
-	bold,
-	BaseMessageOptions,
-	Colors,
 	ActionRowBuilder,
+	BaseMessageOptions,
+	bold,
 	ButtonBuilder,
 	ButtonStyle,
+	Colors,
 	EmbedBuilder,
 	GuildBan,
 	InteractionReplyOptions,
 	MessageEditOptions,
+	Snowflake,
 } from 'discord.js';
 
-interface BanIds {
-	userId: string;
+export interface BanIds {
+	userId: Snowflake;
 	banId?: number;
 }
 
+type IdString = `${string}-${string}` | `${string}-${string}-${string}`;
+
 /**
- * A button for banning a user.
+ * A button for performing an action on a user.
  *
  * In the interaction event for this button, information about the ban can be
- * retrieved using {@link BanButton.getBanIds}.
+ * retrieved using {@link Button.getBanIds}.
  *
  * Rationale:
  * It could be many hours (or even days) between displaying this button and an
  * admin clicking it, if they ever click it at all. Because of this, we need to
  * embed information about the ban in the button itself. The only way to do this
  * is through its ID.
+ *
+ * I guess an alternative would be using a database or something, but I'm not
+ * setting up a whole-ass database when this works fine (albeit a little weird).
  */
-export class BanButton extends ActionRowBuilder {
+export abstract class Button extends ActionRowBuilder {
+	static ID_PREFIX: string;
+
+	/** Determines if the given string is any valid button ID format. */
+	private static hasIds(id: string): id is IdString {
+		const ids = id.split('-');
+		return (
+			ids[1].length >= 18 && // Snowflake length
+			2 <= ids.length     &&
+			3 >= ids.length
+		);
+	}
+
+	/**
+	 * Determines if the given string is an ID for this button.
+	 * Subclasses inherit this and override {@link ID_PREFIX}.
+	 */
+	static isButtonId(id: string): id is IdString {
+		const ids = id.split('-');
+		return ids[0] === this.ID_PREFIX && this.hasIds(id);
+	}
+
+	/** Extracts ban IDs from the given string. */
+	static getBanIds(id: IdString): BanIds;
+	static getBanIds(id: string): BanIds | undefined;
+	static getBanIds(id: string | IdString): BanIds | undefined {
+		if (!this.hasIds(id)) return;
+
+		const ids = id.split('-');
+		return {
+			// Ignore prefix id[0]
+			userId: ids[1],
+			banId: ids[2] ? Number.parseInt(ids[2]) : undefined,
+		};
+	}
+
+	static makeBtnId({ userId, banId }: BanIds): string {
+		return `${this.ID_PREFIX}-${userId}${banId ? `-${banId}` : ''}`;
+	}
+}
+
+/** A button for banning a user. */
+export class BanButton extends Button {
 	static ID_PREFIX = 'ban';
-
-	static isButtonId(id: string): boolean {
-		return id.startsWith(BanButton.ID_PREFIX);
-	}
-
-	static getBanIds(id: string): BanIds | undefined {
-		if (BanButton.isButtonId(id)) {
-			const ids = id.split('-');
-			return {
-				userId: ids[1],
-				banId: ids[2] ? Number.parseInt(ids[2]) : undefined,
-			};
-		}
-	}
 
 	constructor({ userId, banId }: BanIds) {
 		super();
 		this.addComponents(new ButtonBuilder()
-			.setCustomId(
-				`${BanButton.ID_PREFIX}-${userId}${banId ? `-${banId}` : ''}`
-			)
+			.setCustomId(BanButton.makeBtnId({ userId, banId }))
 			.setLabel('Ban')
 			.setStyle(ButtonStyle.Danger)
+		);
+	}
+}
+
+/** A generic disabled button. */
+export class DisabledButton extends ActionRowBuilder {
+	constructor(label: string) {
+		super();
+		this.addComponents(new ButtonBuilder()
+			.setCustomId('Ignored')
+			.setDisabled(true)
+			.setLabel(label)
+			.setStyle(ButtonStyle.Secondary)
+		);
+	}
+}
+
+/** A button for unbanning a user. */
+export class UnbanButton extends Button {
+	static ID_PREFIX = 'unban';
+
+	constructor({ userId, banId }: BanIds) {
+		super();
+		this.addComponents(new ButtonBuilder()
+			.setCustomId(UnbanButton.makeBtnId({ userId, banId }))
+			.setLabel('Unban')
+			.setStyle(ButtonStyle.Success)
 		);
 	}
 }
@@ -99,40 +158,69 @@ export const FileReply = ({ data, name, content }: {
 	}],
 });
 
-interface BanEmbedProps {
+interface MemberEventEmbedProps {
 	ban: GuildBan;
 	timestamp: Date;
-	inGuildSince?: Date;
-};
+}
 
-export class BanEmbed extends EmbedBuilder {
-	constructor({ ban, timestamp, inGuildSince }: BanEmbedProps) {
+/** Common config for displaying a guild member in an embed. */
+abstract class MemberEventEmbed extends EmbedBuilder {
+	constructor({ ban, timestamp }: MemberEventEmbedProps) {
 		super();
 
 		const { guild, user } = ban;
-		this.setColor(Colors.Red)
-			.setAuthor({
+		this.setAuthor({
 				name: `${user.username}#${user.discriminator}`,
 				iconURL: user.displayAvatarURL(),
 			})
-			.setDescription(bold(`${user} was banned`))
 			.addFields({
 				name: 'Account Age',
 				value: formatDistance(Date.now(), user.createdAt),
 				inline: true,
 			})
 			.addFields({ name: 'User ID', value: user.id, inline: true })
+			.setFooter({ text: guild.name, iconURL: guild.iconURL() || undefined })
+			.setTimestamp(timestamp);
+	}
+}
+
+type BanEmbedProps = MemberEventEmbedProps & { inGuildSince?: Date };
+
+/** An embed explaining why a guild member was banned. */
+export class BanEmbed extends MemberEventEmbed {
+	constructor({ ban, timestamp, inGuildSince }: BanEmbedProps) {
+		super({ ban, timestamp });
+
+		const { reason, user } = ban;
+		this.setColor(Colors.Red)
+			.setDescription(bold(`${user} was banned`))
 			.addFields({
 				name: `${inGuildSince ? '' : 'Not '} In Your Server`,
 				value: inGuildSince ? formatDistance(Date.now(), inGuildSince) : ' ',
 				inline: true,
-			})
-			.setFooter({ text: guild.name, iconURL: guild.iconURL() || undefined })
-			.setTimestamp(timestamp);
+			});
 
-		if (ban.reason) {
-			this.addFields({ name: 'Reason', value: ban.reason });
+		if (reason) {
+			this.addFields({ name: 'Reason', value: reason });
 		}
+	}
+}
+
+type UnbanEmbedProps = MemberEventEmbedProps & { bannedSince?: Date };
+
+/** An embed informing that a guild member was unbanned. */
+export class UnbanEmbed extends MemberEventEmbed {
+	constructor({ ban, timestamp, bannedSince }: UnbanEmbedProps) {
+		super({ ban, timestamp });
+
+		const { user } = ban;
+		this.setColor(Colors.Green)
+			.setDescription(bold(`${user} was unbanned`))
+			.addFields({
+				name: `${bannedSince ? '' : 'Not '} Banned In Your Server`,
+				value: bannedSince ? formatDistance(Date.now(), bannedSince) : ' ',
+				inline: true,
+			});
 	}
 }
 

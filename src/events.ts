@@ -17,20 +17,38 @@ import {
 } from 'discord.js';
 import { detail, GlobalLogger } from '@mimickal/discord-logging';
 
-import { banUser, recordUserBan } from './ban';
+import {
+	banCameFromThisBot,
+	banGuildHasBroadcastingEnabled,
+	banUser,
+	fetchGuildAlertChannel,
+	recordUserBan,
+	recordUserUnban,
+	unbanUser,
+} from './ban';
 import commands from './commands';
 import {
 	BanEmbed,
 	BanButton,
+	DisabledButton,
 	ErrorMsg,
 	GoodMsg,
 	InfoMsg,
 	WarnMsg,
+	UnbanEmbed,
+	UnbanButton,
 } from './components';
 import { APP_NAME, GuildConfig } from './config';
 import * as database from './database';
 import { GuildRow, RowId } from './database';
-import { fetchAll } from './util';
+import { fetchAll, ignoreError } from './util';
+
+interface BanAlert {
+	ban: GuildBan;
+	guildRow: GuildRow;
+	timestamp: Date;
+	banId?: RowId;
+}
 
 const logger = GlobalLogger.logger;
 
@@ -122,29 +140,26 @@ export async function onInteraction(interaction: BaseInteraction): Promise<void>
 
 /** Event handler for a User being banned. */
 export async function onUserBanned(ban: GuildBan): Promise<void> {
+	// Ban doesn't have a timestamp, so we use our own. Close enough.
+	const timestamp = new Date(Date.now());
 	logger.info(`${detail(ban.guild)} banned ${detail(ban.user)}`);
+
 	await ban.fetch(); // Sometimes need to fetch to get reason
 
-	// Ban doesn't have a timestamp, so we use our own. Close enough.
-	const bannedAt = new Date(Date.now());
 	const banId = await recordUserBan({
-		bannedAt: bannedAt,
+		bannedAt: timestamp,
 		guildId: ban.guild.id,
 		reason: ban.reason,
 		user: ban.user,
 	});
 
-	// Don't broadcast bans initiated by this bot. Kind of a hack, but it works.
-	if (ban.reason?.startsWith(APP_NAME)) return;
-
-	// Don't broadcast bans if the originating guild has it disabled
-	const guildConfig = await GuildConfig.for(ban.guild.id);
-	if (!guildConfig.broadcast) return;
+	if (banCameFromThisBot(ban)) return;
+	if (!await banGuildHasBroadcastingEnabled(ban)) return;
 
 	const guildRows = await database.getGuilds();
 	for await (const guildRow of guildRows) {
 		try {
-			await sendBanAlert({ ban, bannedAt, banId, guildRow });
+			await sendBanAlert({ ban, banId, guildRow, timestamp });
 		} catch (err) {
 			// Can't use detail because we only have the Guild ID here.
 			logger.warn(`Failed to send ban alert to Guild ${guildRow.id}`, err);
@@ -152,19 +167,15 @@ export async function onUserBanned(ban: GuildBan): Promise<void> {
 	}
 }
 
-async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
-	ban: GuildBan;
-	bannedAt: Date;
-	guildRow: GuildRow;
-	banId?: RowId;
-}): Promise<void> {
+async function sendBanAlert({
+	ban, banId, guildRow, timestamp,
+}: BanAlert): Promise<void> {
 	// Don't send alert to the guild the ban came from.
 	if (guildRow.id === ban.guild.id) return;
 
-	const guildConfig = await GuildConfig.for(guildRow.id);
-
 	// Don't send alert if we, you know, can't.
-	if (!guildConfig.alertChannelId) return;
+	const alertChannel = await fetchGuildAlertChannel(ban);
+	if (!alertChannel) return;
 
 	// Don't send alert if user is already banned in this guild.
 	const existingBan = await database.getBan({
@@ -173,72 +184,108 @@ async function sendBanAlert({ ban, bannedAt, banId, guildRow }: {
 	});
 	if (existingBan) return;
 
-	const channel = await ban.client.channels.fetch(guildConfig.alertChannelId);
-	if (!channel?.isTextBased()) {
-		throw new Error(`Invalid channel ${guildConfig.alertChannelId}`);
-	}
-
 	const guild = await ban.client.guilds.fetch(guildRow.id);
-	let inGuildSince: Date | undefined;
-	try {
-		inGuildSince = (await guild.members.fetch(ban.user.id)).joinedAt ?? undefined;
-	} catch {} // Throws an error if member is not in Guild.
+	const inGuildSince = await ignoreError(async () => (
+		(await guild.members.fetch(ban.user.id)).joinedAt ?? undefined
+	));
 
-	await channel.send({
-		embeds: [new BanEmbed({
-			ban: ban,
-			timestamp: bannedAt,
-			inGuildSince: inGuildSince,
-		})],
-		// @ts-ignore TODO ask djs support why this type isn't playing nice.
+	await alertChannel.send({
+		embeds: [new BanEmbed({ ban, timestamp, inGuildSince })],
+		// @ts-expect-error TODO ask djs support why this type isn't playing nice.
 		components: [new BanButton({ userId: ban.user.id, banId })],
 	});
 }
 
 /** Event handler for a User being unbanned. */
 export async function onUserUnbanned(ban: GuildBan): Promise<void> {
+	// Ban doesn't have a timestamp, so we use our own. Close enough (still).
+	const timestamp = new Date(Date.now());
 	logger.info(`${detail(ban.guild)} unbanned ${detail(ban.user)}`);
 
-	try {
-		await database.removeBan({
-			guild_id: ban.guild.id,
-			user_id: ban.user.id,
-		});
-	} catch (err) {
-		logger.error(`Failed to remove ${detail(ban)} from database`, err);
+	const banId = await recordUserUnban({
+		guildId: ban.guild.id,
+		userId: ban.user.id,
+	});
+
+	if (banCameFromThisBot(ban)) return;
+	if (!(await banGuildHasBroadcastingEnabled(ban))) return;
+
+	const guildRows = await database.getGuilds();
+	for await (const guildRow of guildRows) {
+		try {
+			await sendUnBanAlert({ ban, banId, guildRow, timestamp });
+		} catch (err) {
+			// Can't use detail because we only have the Guild ID here.
+			logger.warn(`Failed to send unban alert to Guild ${guildRow.id}`, err);
+		}
 	}
-	// TODO do we want to alert other servers?
+}
+
+async function sendUnBanAlert({
+	ban, banId, guildRow, timestamp
+}: BanAlert): Promise<void> {
+	// Don't send unban to the guild the unban game from.
+	if (guildRow.id === ban.guild.id) return;
+
+	// Don't send unban if we can't.
+	const alertChannel = await fetchGuildAlertChannel(ban);
+	if (!alertChannel) return;
+
+	// DO send unban alert even if the user isn't banned.
+	// We need to correct any previous ban alert we may have sent.
+	const existingBan = await database.getBan({
+		guild_id: guildRow.id,
+		user_id: ban.user.id,
+	});
+	const bannedSince = existingBan?.banned_at;
+
+	await alertChannel.send({
+		embeds: [new UnbanEmbed({ ban, bannedSince, timestamp })],
+		// @ts-expect-error TODO ask djs support why this type isn't playing nice.
+		components: [new UnbanButton({ userId: ban.user.id, banId })],
+	});
 }
 
 /** Handler for a button press. */
 async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
-	if (!BanButton.isButtonId(interaction.customId)) {
+	if (BanButton.isButtonId(interaction.customId)) {
+		handleBanButton(interaction);
+	} else if (UnbanButton.isButtonId(interaction.customId)) {
+		handleUnbanButton(interaction);
+	} else {
 		logger.warn(`Unrecognized button interaction: ${interaction.customId}`);
 		return;
 	}
+}
 
+/** Handler for ban button press. */
+async function handleBanButton(interaction: ButtonInteraction): Promise<void> {
 	const guild = interaction.guild;
 	if (!guild) return;
 
 	const { userId, banId } = BanButton.getBanIds(interaction.customId)!;
 
-	const existingBan = await database.getBan({
+	const existingDiscordBan = await ignoreError(() => guild.bans.fetch(userId));
+	const existingBotBan = await database.getBan({
 		guild_id: guild.id,
 		user_id: userId,
 	});
-	if (existingBan) {
+
+	if (existingDiscordBan && existingBotBan) {
 		await interaction.reply(InfoMsg('User already banned'));
+		await disableButton(interaction, 'Banned');
 		return;
 	}
 
 	logger.info(`Button banning User ${userId} in ${detail(guild)}`);
-	const reason = `${APP_NAME}: Confirmed by admin`;
+	const reason = `${APP_NAME}: Ban confirmed by admin`;
 
 	try {
 		// The ban event will also try to store the ban, but we won't have
 		// access to the reference banId there, so just do the ban here.
 		const user = await interaction.client.users.fetch(userId);
 		await banUser({ guild, reason, user, refBanId: banId });
+		await disableButton(interaction, 'Banned');
 	} catch (err) {
 		if (err instanceof DiscordAPIError) {
 			await interaction.reply(ErrorMsg(
@@ -255,4 +302,67 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 	}
 
 	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
+}
+
+/** Handler for unban button press. */
+async function handleUnbanButton(interaction: ButtonInteraction): Promise<void> {
+	const guild = interaction.guild;
+	if (!guild) return;
+
+	const { userId } = BanButton.getBanIds(interaction.customId)!;
+
+	const existingDiscordBan = await ignoreError(() => guild.bans.fetch(userId));
+	const existingBotBan = await database.getBan({
+		guild_id: guild.id,
+		user_id: userId,
+	});
+
+	if (!existingDiscordBan && !existingBotBan) {
+		await interaction.reply(InfoMsg('User is not banned'));
+		await disableButton(interaction, 'Not Banned');
+		return;
+	}
+
+	logger.info(`Button unbanning User ${userId} in ${detail(guild)}`);
+	const reason = `${APP_NAME}: Unban confirmed by admin`;
+
+	try {
+		// The ban event will also try to store the ban, but we won't have
+		// access to the reference banId there, so just do the ban here.
+		const user = await interaction.client.users.fetch(userId);
+		await unbanUser({ guild, reason, userId: user.id });
+		await disableButton(interaction, 'Not Banned');
+	} catch (err) {
+		if (err instanceof DiscordAPIError) {
+			await interaction.reply(ErrorMsg(
+				'Cannot unban user. Do I have the right permissions?'
+			));
+		} else {
+			await interaction.reply(WarnMsg(
+				'User was successfully unbanned in your server, but I failed ' +
+				'to record it in my database. If you want to record this ' +
+				'unban, click the unban button again.'
+			));
+		}
+		return;
+	}
+
+	await interaction.reply(GoodMsg(`Unbanned user ${userMention(userId)}`));
+}
+
+async function disableButton(
+	interaction: ButtonInteraction,
+	label: string,
+): Promise<void> {
+	try {
+		await interaction.message.edit({
+			// @ts-expect-error TODO ask djs devs what's up
+			components: [new DisabledButton(label)],
+		});
+	} catch (err) {
+		// If we fail to disable this button, the worst thing that happens is
+		// someone might click it again, which we account for. The ban already
+		// happened, so just log this failure and move on.
+		logger.warn(`Failed to disable ban button on ${detail(interaction.message)}`);
+	}
 }

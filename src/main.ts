@@ -50,10 +50,14 @@ client.on(Discord.Events.InteractionCreate, events.onInteraction);
 // Every day at midnight
 cron.schedule('0 0 * * *', () => checkForDeletedUsers(client))
 
-logger.info(`Bot is starting with config: ${JSON.stringify({
-	...config.Env,
-	token: '<REDACTED>',
-})}`);
+logger.info(
+	`Bot is starting version ${
+		config.Package.version
+	} with config: ${JSON.stringify({
+		...config.Env,
+		token: '<REDACTED>',
+	})}`
+);
 
 client.login(config.Env.token).catch(err => {
 	logger.error('Failed to log in!', err);
