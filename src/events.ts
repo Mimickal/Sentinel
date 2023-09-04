@@ -24,6 +24,7 @@ import {
 	fetchGuildAlertChannel,
 	recordUserBan,
 	recordUserUnban,
+	unbanUser,
 } from './ban';
 import commands from './commands';
 import {
@@ -247,11 +248,18 @@ async function sendUnBanAlert({
 
 /** Handler for a button press. */
 async function handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
-	if (!BanButton.isButtonId(interaction.customId)) {
+	if (BanButton.isButtonId(interaction.customId)) {
+		handleBanButton(interaction);
+	} else if (UnbanButton.isButtonId(interaction.customId)) {
+		handleUnbanButton(interaction);
+	} else {
 		logger.warn(`Unrecognized button interaction: ${interaction.customId}`);
 		return;
 	}
+}
 
+/** Handler for ban button press. */
+async function handleBanButton(interaction: ButtonInteraction): Promise<void> {
 	const guild = interaction.guild;
 	if (!guild) return;
 
@@ -294,6 +302,52 @@ async function handleButtonInteraction(interaction: ButtonInteraction): Promise<
 	}
 
 	await interaction.reply(GoodMsg(`Banned user ${userMention(userId)}`));
+}
+
+/** Handler for unban button press. */
+async function handleUnbanButton(interaction: ButtonInteraction): Promise<void> {
+	const guild = interaction.guild;
+	if (!guild) return;
+
+	const { userId } = BanButton.getBanIds(interaction.customId)!;
+
+	const existingDiscordBan = await ignoreError(() => guild.bans.fetch(userId));
+	const existingBotBan = await database.getBan({
+		guild_id: guild.id,
+		user_id: userId,
+	});
+
+	if (!existingDiscordBan && !existingBotBan) {
+		await interaction.reply(InfoMsg('User is not banned'));
+		await disableButton(interaction, 'Not Banned');
+		return;
+	}
+
+	logger.info(`Button unbanning User ${userId} in ${detail(guild)}`);
+	const reason = `${APP_NAME}: Unban confirmed by admin`;
+
+	try {
+		// The ban event will also try to store the ban, but we won't have
+		// access to the reference banId there, so just do the ban here.
+		const user = await interaction.client.users.fetch(userId);
+		await unbanUser({ guild, reason, userId: user.id });
+		await disableButton(interaction, 'Not Banned');
+	} catch (err) {
+		if (err instanceof DiscordAPIError) {
+			await interaction.reply(ErrorMsg(
+				'Cannot unban user. Do I have the right permissions?'
+			));
+		} else {
+			await interaction.reply(WarnMsg(
+				'User was successfully unbanned in your server, but I failed ' +
+				'to record it in my database. If you want to record this ' +
+				'unban, click the unban button again.'
+			));
+		}
+		return;
+	}
+
+	await interaction.reply(GoodMsg(`Unbanned user ${userMention(userId)}`));
 }
 
 async function disableButton(

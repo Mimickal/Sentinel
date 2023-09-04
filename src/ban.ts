@@ -90,6 +90,26 @@ export async function banUser({ guild, reason, refBanId, user }: {
 	});
 }
 
+/**
+ * Unbans the given User in the given Guild, and persists the ban to the
+ * database.
+ *
+ * @reject {@link DiscordAPIError} if we fail to do the unban in Discord,
+ * otherwise whatever Knex throws for failed queries.
+ */
+export async function unbanUser({ guild, reason, userId }: {
+	guild: Guild;
+	reason: string;
+	userId: Snowflake;
+}): Promise<RowId> {
+	await guild.bans.remove(userId, reason)
+
+	return await recordUserUnban({
+		guildId: guild.id,
+		userId: userId,
+	});
+}
+
 /** Uses the reason on a ban to determine if the operation came from this bot. */
 export function banCameFromThisBot(ban: GuildBan): boolean {
 	// Kind of a hack, but it works.
