@@ -13,6 +13,8 @@ import {
 	DiscordAPIError,
 	Guild,
 	GuildBan,
+	Snowflake,
+	TextBasedChannel,
 	userMention,
 } from 'discord.js';
 import { detail, GlobalLogger } from '@mimickal/discord-logging';
@@ -21,7 +23,6 @@ import {
 	banCameFromThisBot,
 	banGuildHasBroadcastingEnabled,
 	banUser,
-	fetchGuildAlertChannel,
 	recordUserBan,
 	recordUserUnban,
 	unbanUser,
@@ -174,7 +175,7 @@ async function sendBanAlert({
 	if (guildRow.id === ban.guild.id) return;
 
 	// Don't send alert if we, you know, can't.
-	const alertChannel = await fetchGuildAlertChannel(ban);
+	const alertChannel = await fetchGuildAlertChannel(ban.client, guildRow.id);
 	if (!alertChannel) return;
 
 	// Don't send alert if user is already banned in this guild.
@@ -228,7 +229,7 @@ async function sendUnBanAlert({
 	if (guildRow.id === ban.guild.id) return;
 
 	// Don't send unban if we can't.
-	const alertChannel = await fetchGuildAlertChannel(ban);
+	const alertChannel = await fetchGuildAlertChannel(ban.client, guildRow.id);
 	if (!alertChannel) return;
 
 	// DO send unban alert even if the user isn't banned.
@@ -244,6 +245,22 @@ async function sendUnBanAlert({
 		// @ts-expect-error TODO ask djs support why this type isn't playing nice.
 		components: [new UnbanButton({ userId: ban.user.id, banId })],
 	});
+}
+
+/** Gets the configured alert channel for the given guild. */
+async function fetchGuildAlertChannel(
+	client: Client, guildId: Snowflake,
+): Promise<TextBasedChannel | null> {
+	const guildConfig = await GuildConfig.for(guildId);
+	if (!guildConfig.alertChannelId) return null;
+
+	// Verify this is a channel we can actually send messages to.
+	const alertChannel = await client.channels.fetch(guildConfig.alertChannelId);
+	if (!alertChannel?.isTextBased() || alertChannel.hasOwnProperty('send')) {
+		throw new Error(`Invalid channel ${guildConfig.alertChannelId}`);
+	}
+
+	return alertChannel;
 }
 
 /** Handler for a button press. */

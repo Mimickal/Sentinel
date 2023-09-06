@@ -11,7 +11,6 @@ import {
 	Guild,
 	GuildBan,
 	Snowflake,
-	TextBasedChannel,
 	User,
 } from 'discord.js';
 import { GlobalLogger } from '@mimickal/discord-logging';
@@ -123,18 +122,4 @@ export function banCameFromThisBot(ban: GuildBan): boolean {
 export async function banGuildHasBroadcastingEnabled(ban: GuildBan): Promise<boolean> {
 	const guildConfig = await GuildConfig.for(ban.guild.id);
 	return guildConfig.broadcast ?? false;
-}
-
-/** Gets the configured alert channel for the guild the given ban came from. */
-export async function fetchGuildAlertChannel(ban: GuildBan): Promise<TextBasedChannel | null> {
-	const guildConfig = await GuildConfig.for(ban.guild.id);
-	if (!guildConfig.alertChannelId) return null;
-
-	// Verify this is a channel we can actually send messages to.
-	const alertChannel = await ban.client.channels.fetch(guildConfig.alertChannelId);
-	if (!alertChannel?.isTextBased() || alertChannel.hasOwnProperty('send')) {
-		throw new Error(`Invalid channel ${guildConfig.alertChannelId}`);
-	}
-
-	return alertChannel;
 }
